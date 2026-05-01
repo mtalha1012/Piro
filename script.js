@@ -1,4 +1,5 @@
-// DOM Elements
+// --- DOM Elements ---
+const homeScreen = document.getElementById('homeScreen');
 const repoForm = document.getElementById('repoForm');
 const repoUrlInput = document.getElementById('repoUrl');
 const statusMessage = document.getElementById('statusMessage');
@@ -6,28 +7,29 @@ const selectionUI = document.getElementById('selectionUI');
 const treeContainer = document.getElementById('treeContainer');
 const generateBtn = document.getElementById('generateBtn');
 const selectionMode = document.getElementById('selectionMode');
+const exportFormat = document.getElementById('exportFormat'); // <-- Added
 const selectAllBtn = document.getElementById('selectAllBtn');
+const backBtn = document.getElementById('backBtn');
+const displayRepoName = document.getElementById('displayRepoName');
+const includeImagesToggle = document.getElementById('includeImages');
+
+// Progress Bar
 const progressContainer = document.getElementById('progressContainer');
 const progressCount = document.getElementById('progressCount');
 const progressBarFill = document.getElementById('progressBarFill');
-const progressStateText = document.getElementById('progressStateText');
 
-// Constants ported from Python
-const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.bmp'];
-const BINARY_EXTENSIONS = [
-    '.mp4', '.mp3', '.wav', '.ogg', '.flac', '.zip', '.tar', '.gz', '.rar', '.7z',
-    '.pdf', '.exe', '.dll', '.so', '.dylib', '.class', '.pyc', '.o', '.obj',
-    '.ttf', '.woff', '.woff2', '.eot'
-];
-
+// --- State & Constants ---
 let repoData = { owner: '', repo: '', branch: '' };
 let allFiles = [];
 let lastCheckedNode = null;
 
-// Utility to check file types
+const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.bmp'];
+const BINARY_EXTENSIONS = ['.mp4', '.mp3', '.wav', '.zip', '.pdf', '.exe', '.pyc'];
+
 const isImage = (path) => IMAGE_EXTENSIONS.some(ext => path.toLowerCase().endsWith(ext));
 const isBinary = (path) => BINARY_EXTENSIONS.some(ext => path.toLowerCase().endsWith(ext));
 
+// --- Utility Functions ---
 function parseGitHubUrl(url) {
     try {
         const urlObj = new URL(url);
@@ -39,237 +41,34 @@ function parseGitHubUrl(url) {
     }
 }
 
-// -----------------------------------------
-// PHASE 1: Fetch and Render Tree
-// -----------------------------------------
-repoForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    toggleLoadingState('fetch', true);
-    
-    try {
-        const { owner, repo } = parseGitHubUrl(repoUrlInput.value);
-        repoData.owner = owner;
-        repoData.repo = repo;
-
-        const repoRes = await fetch(`https://api.github.com/repos/${owner}/${repo}`);
-        if (!repoRes.ok) throw new Error("Repository not found or API rate limit exceeded.");
-        const repoJson = await repoRes.json();
-        repoData.branch = repoJson.default_branch;
-
-        const treeRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/${repoData.branch}?recursive=1`);
-        if (!treeRes.ok) throw new Error("Failed to fetch repository tree.");
-        const treeJson = await treeRes.json();
-
-        // Filter out strict binaries, but keep images for document rendering
-        allFiles = treeJson.tree
-            .filter(item => item.type === 'blob' && !isBinary(item.path))
-            .map(item => item.path);
-        
-        buildTreeUI(allFiles);
-        selectionUI.classList.remove('hidden');
-        
-    } catch (error) {
-        showError(error.message);
-    } finally {
-        toggleLoadingState('fetch', false);
-    }
-});
-
-// -----------------------------------------
-// PHASE 2: Client-Side ZIP Assembly
-// -----------------------------------------
-generateBtn.addEventListener('click', async () => {
-    toggleLoadingState('gen', true);
-    progressContainer.classList.remove('hidden');
-    
-    try {
-        const selectedPaths = Array.from(treeContainer.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value);
-        const mode = selectionMode.value;
-        let targetFiles = mode === 'include' 
-            ? allFiles.filter(f => selectedPaths.some(p => f.startsWith(p)))
-            : allFiles.filter(f => !selectedPaths.some(p => f.startsWith(p)));
-
-        if (targetFiles.length === 0) throw new Error("No files selected to generate.");
-
-        // Fetch Zipball
-        progressStateText.textContent = "Downloading Repository Archive...";
-        progressBarFill.style.width = `10%`;
-        
-        const zipUrl = `https://codeload.github.com/${repoData.owner}/${repoData.repo}/zip/refs/heads/${repoData.branch}`;
-        const zipRes = await fetch(zipUrl);
-        if (!zipRes.ok) throw new Error("Failed to download repository zipball.");
-        const zipBlob = await zipRes.blob();
-        
-        progressStateText.textContent = "Extracting and Stitching...";
-        const zipData = await JSZip.loadAsync(zipBlob);
-        
-        // GitHub zips contain a root folder (e.g. repoName-branchName/)
-        const rootFolder = Object.keys(zipData.files)[0].split('/')[0];
-        
-        // Initialize Docx Document
-        const docSections = [];
-
-        // Add Title Page
-        docSections.push({
-            children: [
-                new docx.Paragraph({
-                    text: `Project Codebase: ${repoData.repo}`,
-                    heading: docx.HeadingLevel.TITLE,
-                    alignment: docx.AlignmentType.CENTER,
-                    spacing: { before: 2000, after: 400 }
-                }),
-                new docx.Paragraph({
-                    text: `Repository: https://github.com/${repoData.owner}/${repoData.repo}`,
-                    alignment: docx.AlignmentType.CENTER,
-                    pageBreakBefore: false
-                })
-            ]
-        });
-
-        // Add ASCII Tree
-        const asciiTree = generateAsciiTree(targetFiles);
-        docSections.push({
-            children: [
-                new docx.Paragraph({ text: "Repository Structure", heading: docx.HeadingLevel.HEADING_1, pageBreakBefore: true }),
-                new docx.Paragraph({
-                    children: [new docx.TextRun({ text: asciiTree, font: "Consolas", size: 20 })]
-                })
-            ]
-        });
-
-        // Process Files
-        let processed = 0;
-        const bodyChildren = [new docx.Paragraph({ pageBreakBefore: true })]; // Start files on new page
-
-        for (const path of targetFiles) {
-            processed++;
-            progressCount.textContent = `${processed}/${targetFiles.length}`;
-            progressBarFill.style.width = `${10 + (processed / targetFiles.length) * 90}%`;
-
-            const zipPath = `${rootFolder}/${path}`;
-            const fileEntry = zipData.file(zipPath);
-            if (!fileEntry) continue;
-
-            bodyChildren.push(new docx.Paragraph({ text: path, heading: docx.HeadingLevel.HEADING_2, spacing: { before: 400, after: 200 } }));
-
-            if (isImage(path)) {
-                // Image Processing
-                const uint8 = await fileEntry.async("uint8array");
-                const dimensions = await getImageDimensions(uint8, path);
-                bodyChildren.push(new docx.Paragraph({
-                    children: [
-                        new docx.ImageRun({
-                            data: uint8,
-                            transformation: { width: dimensions.width, height: dimensions.height }
-                        })
-                    ]
-                }));
-            } else {
-                // Code Processing
-                const rawText = await fileEntry.async("string");
-                const cellParagraphs = colorizeCodeToDocx(rawText, path);
-                
-                bodyChildren.push(new docx.Table({
-                    width: { size: 100, type: docx.WidthType.PERCENTAGE },
-                    borders: docx.TableBorders.NONE,
-                    rows: [
-                        new docx.TableRow({
-                            children: [
-                                new docx.TableCell({
-                                    shading: { fill: "F6F8FA" }, // GitHub Light gray background
-                                    children: cellParagraphs
-                                })
-                            ]
-                        })
-                    ]
-                }));
-            }
-            bodyChildren.push(new docx.Paragraph({ text: "" })); // Spacing
-        }
-
-        docSections.push({ children: bodyChildren });
-
-        // Compile and Download
-        progressStateText.textContent = "Compiling Word Document...";
-        const doc = new docx.Document({ sections: docSections });
-        const blob = await docx.Packer.toBlob(doc);
-        saveAs(blob, `${repoData.repo}_Report.docx`);
-        
-    } catch (error) {
-        showError(error.message);
-    } finally {
-        toggleLoadingState('gen', false);
-        setTimeout(() => progressContainer.classList.add('hidden'), 2000);
-    }
-});
-
-// -----------------------------------------
-// Syntx Highlighting Engine (Highlight.js -> Docx)
-// -----------------------------------------
-const hljsColorMap = {
-    'hljs-keyword': '569cd6', 'hljs-built_in': '4ec9b0', 'hljs-type': '4ec9b0',
-    'hljs-literal': '569cd6', 'hljs-number': 'b5cea8', 'hljs-regexp': 'd16969',
-    'hljs-string': 'd69d85', 'hljs-subst': 'd4d4d4', 'hljs-symbol': 'd69d85',
-    'hljs-class': '4ec9b0', 'hljs-function': 'dcdcaa', 'hljs-title': 'dcdcaa',
-    'hljs-params': '9cdcfe', 'hljs-comment': '57a64a', 'hljs-doctag': '608b4e',
-    'hljs-meta': '9b9b9b', 'hljs-name': '569cd6', 'hljs-attr': '9cdcfe',
-    'hljs-variable': '9cdcfe', 'default': 'd4d4d4' // VS Code Dark Theme Colors
-};
-
-function colorizeCodeToDocx(rawText, filename) {
-    const ext = filename.split('.').pop();
-    const highlighted = hljs.getLanguage(ext) 
-        ? hljs.highlight(rawText, { language: ext }).value 
-        : hljs.highlightAuto(rawText).value;
-
-    const parser = new DOMParser();
-    const dom = parser.parseFromString(`<div>${highlighted}</div>`, 'text/html');
-    const paragraphs = [];
-    let currentRuns = [];
-
-    function walk(node, currentColor) {
-        if (node.nodeType === Node.TEXT_NODE) {
-            const lines = node.textContent.split('\n');
-            lines.forEach((line, index) => {
-                if (line) {
-                    currentRuns.push(new docx.TextRun({ text: line, color: currentColor, font: "Consolas", size: 18 }));
-                }
-                if (index < lines.length - 1) {
-                    paragraphs.push(new docx.Paragraph({ children: currentRuns, spacing: { after: 0, line: 240 } }));
-                    currentRuns = [];
-                }
-            });
-        } else if (node.nodeType === Node.ELEMENT_NODE) {
-            let color = currentColor;
-            if (node.className && node.className.startsWith('hljs-')) {
-                const matchedClass = node.className.split(' ').find(c => hljsColorMap[c]);
-                if (matchedClass) color = hljsColorMap[matchedClass];
-            }
-            node.childNodes.forEach(child => walk(child, color));
-        }
-    }
-
-    walk(dom.body.firstChild, hljsColorMap['default']);
-    if (currentRuns.length > 0) paragraphs.push(new docx.Paragraph({ children: currentRuns, spacing: { after: 0, line: 240 } }));
-    
-    // Fallback if empty
-    if (paragraphs.length === 0) paragraphs.push(new docx.Paragraph({ text: " " }));
-    return paragraphs;
+function toggleLoadingState(prefix, isLoading) {
+    const btnId = prefix === 'gen' ? 'generateBtn' : 'fetchBtn';
+    const btn = document.getElementById(btnId);
+    if (!btn) return;
+    btn.disabled = isLoading;
+    document.getElementById(`${prefix}BtnText`).classList.toggle('hidden', isLoading);
+    document.getElementById(`${prefix}Loader`).classList.toggle('hidden', !isLoading);
 }
 
-// -----------------------------------------
-// Helper Functions ported from Python
-// -----------------------------------------
+function showError(msg) {
+    statusMessage.textContent = msg;
+    statusMessage.classList.remove('hidden');
+    statusMessage.classList.add('error');
+}
+
+function validateGenerateBtn() {
+    const checkedCount = treeContainer.querySelectorAll('input[type="checkbox"]:checked').length;
+    generateBtn.disabled = (selectionMode.value === 'include' && checkedCount === 0);
+}
+
+// Generate an ASCII visual tree for Markdown exports
 function generateAsciiTree(paths) {
     const tree = {};
     paths.forEach(path => {
         const parts = path.split('/');
         let current = tree;
-        parts.forEach(part => {
-            current = current[part] = current[part] || {};
-        });
+        parts.forEach(part => { current = current[part] = current[part] || {}; });
     });
-
     const lines = [];
     function buildLines(node, prefix = "") {
         const entries = Object.keys(node);
@@ -283,36 +82,167 @@ function generateAsciiTree(paths) {
     return lines.join('\n');
 }
 
-async function getImageDimensions(uint8array, filename) {
-    const ext = filename.split('.').pop().toLowerCase();
-    const mime = ext === 'jpg' ? 'jpeg' : ext;
-    return new Promise((resolve) => {
-        const blob = new Blob([uint8array], { type: `image/${mime}` });
-        const url = URL.createObjectURL(blob);
-        const img = new Image();
-        img.onload = () => {
-            URL.revokeObjectURL(url);
-            // Scale to max width of 600px for docx to avoid page overflow
-            let w = img.naturalWidth; let h = img.naturalHeight;
-            if (w > 600) { h = Math.round(h * (600 / w)); w = 600; }
-            resolve({ width: w, height: h });
-        };
-        img.onerror = () => resolve({ width: 300, height: 300 }); // Safe fallback
-        img.src = url;
-    });
-}
+// --- Navigation ---
+backBtn.addEventListener('click', () => {
+    selectionUI.classList.add('hidden');
+    homeScreen.classList.remove('hidden');
+    statusMessage.classList.add('hidden');
+});
 
-// -----------------------------------------
-// Tree UI & State Logic (Unchanged)
-// -----------------------------------------
+// --- Phase 1: Fetch Repo ---
+repoForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    toggleLoadingState('fetch', true);
+    statusMessage.classList.add('hidden');
+    
+    try {
+        const { owner, repo } = parseGitHubUrl(repoUrlInput.value);
+        repoData.owner = owner;
+        repoData.repo = repo;
+
+        const repoRes = await fetch(`https://api.github.com/repos/${owner}/${repo}`);
+        if (!repoRes.ok) throw new Error("Repository not found.");
+        const repoJson = await repoRes.json();
+        repoData.branch = repoJson.default_branch;
+
+        const treeRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/${repoData.branch}?recursive=1`);
+        const treeJson = await treeRes.json();
+
+        allFiles = treeJson.tree
+            .filter(item => item.type === 'blob' && !isBinary(item.path))
+            .map(item => item.path);
+        
+        displayRepoName.textContent = `${owner} / ${repo}`;
+        homeScreen.classList.add('hidden');
+        selectionUI.classList.remove('hidden');
+        
+        buildTreeUI(allFiles);
+        validateGenerateBtn();
+        
+    } catch (error) {
+        showError(error.message);
+    } finally {
+        toggleLoadingState('fetch', false);
+    }
+});
+
+// --- Phase 2: Generate Document (HIGH SPEED BATCHING) ---
+generateBtn.addEventListener('click', async () => {
+    toggleLoadingState('gen', true);
+    progressContainer.classList.remove('hidden');
+    const bodyChildren = [];
+    const format = exportFormat.value;
+    
+    try {
+        const selected = Array.from(treeContainer.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value);
+        const shouldIncludeImages = includeImagesToggle.checked;
+
+        let targetFiles = selectionMode.value === 'include' 
+            ? allFiles.filter(f => selected.some(p => f.startsWith(p)))
+            : allFiles.filter(f => !selected.some(p => f.startsWith(p)));
+
+        if (!shouldIncludeImages) targetFiles = targetFiles.filter(f => !isImage(f));
+        if (targetFiles.length === 0) throw new Error("No files selected to generate.");
+
+        // Document Intialization Setup
+        let mdContent = `# Project Codebase: ${repoData.repo}\n**Repository:** https://github.com/${repoData.owner}/${repoData.repo}\n\n`;
+        
+        if (format === 'docx') {
+            bodyChildren.push(new docx.Paragraph({ text: `Project Codebase: ${repoData.repo}`, heading: docx.HeadingLevel.TITLE, alignment: docx.AlignmentType.CENTER, spacing: { before: 2000, after: 400 }}));
+            bodyChildren.push(new docx.Paragraph({ text: `Repository: https://github.com/${repoData.owner}/${repoData.repo}`, alignment: docx.AlignmentType.CENTER }));
+            bodyChildren.push(new docx.Paragraph({ text: "", pageBreakBefore: true }));
+        } else {
+            mdContent += `## Repository Structure\n\`\`\`text\n${generateAsciiTree(targetFiles)}\n\`\`\`\n\n`;
+        }
+
+        let processed = 0;
+        const BATCH_SIZE = 15;
+
+        for (let i = 0; i < targetFiles.length; i += BATCH_SIZE) {
+            const batch = targetFiles.slice(i, i + BATCH_SIZE);
+            const batchResults = await Promise.all(batch.map(async (path) => {
+                const rawUrl = `https://raw.githubusercontent.com/${repoData.owner}/${repoData.repo}/${repoData.branch}/${path}`;
+                try {
+                    const res = await fetch(rawUrl);
+                    if (!res.ok) return null;
+
+                    processed++;
+                    progressCount.textContent = `${processed}/${targetFiles.length}`;
+                    progressBarFill.style.width = `${(processed / targetFiles.length) * 100}%`;
+
+                    if (isImage(path)) {
+                        if (format === 'md') return { type: 'image', path, url: rawUrl }; // MD just needs the link
+                        const buffer = await res.arrayBuffer();
+                        return { type: 'image', path, buffer };
+                    } else {
+                        const text = await res.text();
+                        return { type: 'text', path, text };
+                    }
+                } catch (e) {
+                    console.error(`Failed to fetch ${path}`, e);
+                    return null;
+                }
+            }));
+
+            // Stitch the batch
+            for (const fileData of batchResults) {
+                if (!fileData) continue;
+
+                if (format === 'md') {
+                    // MARKDOWN COMPILATION
+                    mdContent += `## ${fileData.path}\n\n`;
+                    if (fileData.type === 'image') {
+                        mdContent += `![${fileData.path.split('/').pop()}](${encodeURI(fileData.url)})\n\n`;
+                    } else {
+                        const ext = fileData.path.split('.').pop();
+                        mdContent += `\`\`\`${ext}\n${fileData.text}\n\`\`\`\n\n`;
+                    }
+                } else {
+                    // WORD COMPILATION
+                    bodyChildren.push(new docx.Paragraph({ text: fileData.path, heading: docx.HeadingLevel.HEADING_2, spacing: { before: 400, after: 200 }}));
+                    if (fileData.type === 'image') {
+                        bodyChildren.push(new docx.Paragraph({ children: [new docx.ImageRun({ data: fileData.buffer, transformation: { width: 400, height: 300 } })] }));
+                    } else {
+                        const paragraphs = [];
+                        if (fileData.text.length > 30000) {
+                            paragraphs.push(new docx.Paragraph({ children: [new docx.TextRun({ text: "/* File too large for formatting. Rendered as raw text. */\n\n" + fileData.text, font: "Consolas", size: 18 })] }));
+                        } else {
+                            paragraphs.push(new docx.Paragraph({ children: [new docx.TextRun({ text: fileData.text, font: "Consolas", size: 18 })] }));
+                        }
+                        bodyChildren.push(new docx.Table({ width: { size: 100, type: docx.WidthType.PERCENTAGE }, rows: [new docx.TableRow({ children: [new docx.TableCell({ shading: { fill: "F6F8FA" }, children: paragraphs })] })] }));
+                    }
+                    bodyChildren.push(new docx.Paragraph({ text: "" }));
+                }
+            }
+        }
+
+        // Final Download Trigger
+        if (format === 'docx') {
+            const doc = new docx.Document({ sections: [{ children: bodyChildren }] });
+            const blob = await docx.Packer.toBlob(doc);
+            saveAs(blob, `${repoData.repo}_Report.docx`);
+        } else {
+            const blob = new Blob([mdContent], { type: "text/markdown;charset=utf-8" });
+            saveAs(blob, `${repoData.repo}_Report.md`);
+        }
+        
+    } catch (e) {
+        showError(e.message);
+    } finally {
+        toggleLoadingState('gen', false);
+        setTimeout(() => progressContainer.classList.add('hidden'), 2000);
+    }
+});
+
+// --- Tree UI Engine ---
 function buildTreeUI(paths) {
     treeContainer.innerHTML = '';
     const fileTree = {};
     paths.forEach(path => {
         const parts = path.split('/');
         let current = fileTree;
-        parts.forEach((part, index) => {
-            if (index === parts.length - 1) current[part] = null;
+        parts.forEach((part, i) => {
+            if (i === parts.length - 1) current[part] = null;
             else { current[part] = current[part] || {}; current = current[part]; }
         });
     });
@@ -325,20 +255,17 @@ function renderTree(node, parentElement, currentPath) {
         const fullPath = currentPath ? `${currentPath}/${key}` : key;
         const itemDiv = document.createElement('div');
         itemDiv.className = 'tree-item';
-        
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
         checkbox.value = isFile ? fullPath : `${fullPath}/`;
-        
+        checkbox.addEventListener('change', validateGenerateBtn);
         checkbox.addEventListener('click', (e) => handleShiftClick(e, checkbox));
 
         if (!isFile) {
             const chevron = document.createElement('span'); chevron.className = 'chevron collapsed'; chevron.textContent = '▶';
             const label = document.createElement('span'); label.className = 'folder'; label.textContent = key;
             itemDiv.append(chevron, checkbox, label);
-
             const childrenContainer = document.createElement('div'); childrenContainer.className = 'children-container hidden';
-            
             itemDiv.addEventListener('click', (e) => {
                 if (e.target !== checkbox) {
                     childrenContainer.classList.toggle('hidden');
@@ -347,20 +274,21 @@ function renderTree(node, parentElement, currentPath) {
                 }
             });
             checkbox.addEventListener('change', (e) => {
-                childrenContainer.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = e.target.checked);
+                childrenContainer.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = e.target.checked; });
+                validateGenerateBtn();
             });
-
             parentElement.append(itemDiv, childrenContainer);
             renderTree(node[key], childrenContainer, fullPath);
         } else {
-            const spacer = document.createElement('span'); spacer.className = 'spacer';
+            const spacer = document.createElement('span'); spacer.className = 'spacer'; 
+            spacer.style.display = 'inline-block'; spacer.style.width = '16px'; 
             const label = document.createElement('span'); label.className = 'file'; label.textContent = key;
             itemDiv.append(spacer, checkbox, label);
-            
             itemDiv.addEventListener('click', (e) => {
                 if (e.target !== checkbox) {
                     checkbox.checked = !checkbox.checked;
                     handleShiftClick(e, checkbox);
+                    validateGenerateBtn();
                 }
             });
             parentElement.appendChild(itemDiv);
@@ -378,24 +306,14 @@ function handleShiftClick(e, currentCheckbox) {
             const min = Math.min(start, end), max = Math.max(start, end);
             for (let i = min; i <= max; i++) visibleCb[i].checked = lastCheckedNode.checked;
         }
+        validateGenerateBtn();
     }
     lastCheckedNode = currentCheckbox;
 }
 
-selectAllBtn.addEventListener('change', (e) => {
-    treeContainer.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = e.target.checked);
-});
-
-function toggleLoadingState(prefix, isLoading) {
-    const btnId = prefix === 'gen' ? 'generateBtn' : `${prefix}Btn`;
-    document.getElementById(btnId).disabled = isLoading;
-    document.getElementById(`${prefix}BtnText`).classList.toggle('hidden', isLoading);
-    document.getElementById(`${prefix}Loader`).classList.toggle('hidden', !isLoading);
-    statusMessage.classList.add('hidden');
-}
-
-function showError(msg) {
-    statusMessage.textContent = msg;
-    statusMessage.classList.remove('hidden');
-    statusMessage.classList.add('error');
+if (selectAllBtn) {
+    selectAllBtn.addEventListener('change', (e) => {
+        treeContainer.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = e.target.checked);
+        validateGenerateBtn();
+    });
 }
