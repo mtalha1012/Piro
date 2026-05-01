@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Piro | Stitching Code into Context.</title>
+    
+    <!-- Piro Styles -->
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- Required CDNs for Fully Frontend Architecture -->
+    <script src="https://unpkg.com/docx@8.2.2/build/index.umd.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    
+    <!-- Highlight.js for Local Syntax Colorization -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+</head>
+<body>
+    <main class="container">
+        <header>
+            <div class="logo-container">
+                <img src="logo.png" alt="Piro Logo" class="nav-logo">
+                <h1 class="logo">Piro</h1>
+            </div>
+            <p class="subtitle">Stitching Code into Context.</p>
+        </header>
+
+        <section class="info-box">
+            <div class="steps-grid">
+                <div class="step">
+                    <span class="step-num">01 Connect</span>
+                    <p>Paste any public GitHub URL to map the repository structure.</p>
+                </div>
+                <div class="step">
+                    <span class="step-num">02 Select</span>
+                    <p>Use the tree view to include specific logic or exclude noise.</p>
+                </div>
+                <div class="step">
+                    <span class="step-num">03 Stitch</span>
+                    <p>Generate a syntax-highlighted Word document locally.</p>
+                </div>
+            </div>
+        </section>
+
+        <form id="repoForm" class="input-group">
+            <input type="url" id="repoUrl" placeholder="https://github.com/owner/repository" required autofocus>
+            <button type="submit" id="fetchBtn">
+                <span id="fetchBtnText">Fetch Repository</span>
+                <span id="fetchLoader" class="hidden">Mapping Structure...</span>
+            </button>
+        </form>
+
+        <div id="statusMessage" class="status hidden"></div>
+
+        <div id="selectionUI" class="selection-container hidden">
+            <div class="toggle-container">
+                <span>Mode:</span>
+                <select id="selectionMode">
+                    <option value="include">Include Selected</option>
+                    <option value="exclude">Exclude Selected</option>
+                </select>
+            </div>
+
+            <div class="bulk-actions">
+                <label class="select-all-wrapper">
+                    <input type="checkbox" id="selectAllBtn">
+                    <span>Select All</span>
+                </label>
+                <span class="hint-text">💡 Hold <b>Shift</b> to bulk select</span>
+            </div>
+            
+            <div class="tree-container" id="treeContainer">
+                <!-- Tree rendered via JS -->
+            </div>
+
+            <!-- Progress Bar -->
+            <div id="progressContainer" class="progress-wrapper hidden">
+                <div class="progress-info">
+                    <span id="progressStateText">Fetching Zipball...</span>
+                    <span id="progressCount">0/0</span>
+                </div>
+                <div class="progress-bar-bg">
+                    <div id="progressBarFill" class="progress-bar-fill"></div>
+                </div>
+            </div>
+
+            <button id="generateBtn" class="generate-btn">
+                <span id="genBtnText">Generate Document</span>
+                <span id="genLoader" class="hidden">Stitching Code...</span>
+            </button>
+        </div>
+
+        <footer class="social-links">
+            <a href="#" target="_blank">GitHub</a>
+            <span class="divider">|</span>
+            <a href="#" target="_blank">LinkedIn</a>
+            <span class="divider">|</span>
+            <a href="#">Email</a>
+        </footer>
+    </main>
+
+    <script src="script.js"></script>
+</body>
+</html>
