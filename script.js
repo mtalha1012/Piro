@@ -2,12 +2,17 @@
 const homeScreen = document.getElementById('homeScreen');
 const repoForm = document.getElementById('repoForm');
 const repoUrlInput = document.getElementById('repoUrl');
+const githubTokenInput = document.getElementById('githubToken');
+const tokenHintBox = document.getElementById('tokenHintBox');
+const hintBoxText = document.getElementById('hintBoxText');
 const statusMessage = document.getElementById('statusMessage');
+
 const selectionUI = document.getElementById('selectionUI');
 const treeContainer = document.getElementById('treeContainer');
 const generateBtn = document.getElementById('generateBtn');
+const genBtnText = document.getElementById('genBtnText');
 const selectionMode = document.getElementById('selectionMode');
-const exportFormat = document.getElementById('exportFormat'); // <-- Added
+const exportFormat = document.getElementById('exportFormat');
 const selectAllBtn = document.getElementById('selectAllBtn');
 const backBtn = document.getElementById('backBtn');
 const displayRepoName = document.getElementById('displayRepoName');
@@ -23,13 +28,133 @@ let repoData = { owner: '', repo: '', branch: '' };
 let allFiles = [];
 let lastCheckedNode = null;
 
-const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.bmp'];
-const BINARY_EXTENSIONS = ['.mp4', '.mp3', '.wav', '.zip', '.pdf', '.exe', '.pyc'];
+const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.svg', '.ico'];
+const BINARY_EXTENSIONS = ['.mp4', '.mp3', '.wav', '.zip', '.pdf', '.exe', '.pyc', '.ttf', '.woff', '.woff2'];
 
 const isImage = (path) => IMAGE_EXTENSIONS.some(ext => path.toLowerCase().endsWith(ext));
 const isBinary = (path) => BINARY_EXTENSIONS.some(ext => path.toLowerCase().endsWith(ext));
 
+// --- Feature: Bulletproof Autocomplete (Tab or Right Arrow) ---
+repoUrlInput.addEventListener('keydown', function(e) {
+    if (e.key === 'ArrowRight' || e.key === 'Tab') {
+        const currentVal = this.value.trim().toLowerCase();
+        const targetUrl = 'https://github.com/';
+        
+        // Only trigger if they haven't finished the base URL yet
+        if (currentVal !== targetUrl && (currentVal === '' || targetUrl.startsWith(currentVal))) {
+            e.preventDefault(); // Stop browser from jumping to the next box
+            this.value = targetUrl;
+            
+            // Push the cursor to the very end of the newly inserted text
+            setTimeout(() => {
+                this.selectionStart = this.selectionEnd = this.value.length;
+            }, 0);
+        }
+    }
+});
+
+// Reset the error box if the user starts typing a token
+githubTokenInput.addEventListener('input', () => {
+    if (tokenHintBox.classList.contains('error-state')) {
+        tokenHintBox.classList.remove('error-state');
+        hintBoxText.innerHTML = `Provide a <a href="https://github.com/settings/tokens" target="_blank">GitHub Token</a> to export >60 files.`;
+    }
+});
+
 // --- Utility Functions ---
+// Parses highlight.js HTML into one docx.Paragraph per line, VS Code Dark+ colors.
+// Indentation is preserved by converting leading spaces to non-breaking spaces.
+function getHighlightedWordParagraphs(code, filename) {
+    const ext = filename.split('.').pop().toLowerCase();
+    const langMap = {
+        'cpp': 'cpp', 'c': 'c', 'h': 'cpp', 'hpp': 'cpp', 'cc': 'cpp',
+        'js': 'javascript', 'mjs': 'javascript', 'cjs': 'javascript', 'jsx': 'javascript',
+        'ts': 'typescript', 'tsx': 'typescript',
+        'py': 'python', 'java': 'java',
+        'html': 'xml', 'htm': 'xml', 'xml': 'xml', 'vue': 'xml',
+        'css': 'css', 'scss': 'css', 'less': 'css',
+        'json': 'json', 'jsonc': 'json',
+        'md': 'markdown',
+        'go': 'go', 'rs': 'rust', 'rb': 'ruby',
+        'sh': 'bash', 'bash': 'bash', 'zsh': 'bash',
+        'yaml': 'yaml', 'yml': 'yaml',
+        'php': 'php', 'swift': 'swift', 'kt': 'kotlin', 'cs': 'csharp',
+        'sql': 'sql', 'dart': 'dart', 'r': 'r'
+    };
+    const lang = langMap[ext] || 'plaintext';
+
+    let highlightedHtml = code;
+    try {
+        highlightedHtml = hljs.highlight(code, { language: lang, ignoreIllegals: true }).value;
+    } catch (e) {
+        try { highlightedHtml = hljs.highlightAuto(code).value; } catch(ex) {}
+    }
+
+    const tempDiv = document.createElement('pre');
+    tempDiv.innerHTML = highlightedHtml;
+
+    const colorMap = {
+        'hljs-keyword': '569CD6',
+        'hljs-built_in': '4EC9B0',
+        'hljs-type': '4EC9B0',
+        'hljs-title': 'DCDCAA',
+        'hljs-title.class': '4EC9B0',
+        'hljs-title.function': 'DCDCAA',
+        'hljs-string': 'CE9178',
+        'hljs-number': 'B5CEA8',
+        'hljs-comment': '6A9955',
+        'hljs-variable': '9CDCFE',
+        'hljs-params': '9CDCFE',
+        'hljs-property': '9CDCFE',
+        'hljs-attr': '9CDCFE',
+        'hljs-meta': 'C586C0',
+        'hljs-literal': '569CD6'
+    };
+
+    const lines = [[]];
+
+    function traverse(node, currentColor) {
+        if (node.nodeType === Node.TEXT_NODE) {
+            const text = node.textContent;
+            if (text) {
+                const parts = text.split('\n');
+                parts.forEach((part, idx) => {
+                    if (idx > 0) lines.push([]);
+                    if (part) {
+                        // Preserve leading indentation — Word collapses plain spaces
+                        const preserved = part.replace(/^ +/g, m => ' '.repeat(m.length));
+                        lines[lines.length - 1].push(new docx.TextRun({
+                            text: preserved,
+                            color: currentColor,
+                            font: 'Consolas',
+                            size: 18
+                        }));
+                    }
+                });
+            }
+        } else if (node.nodeType === Node.ELEMENT_NODE) {
+            let newColor = currentColor;
+            if (node.className && typeof node.className === 'string') {
+                const classes = node.className.split(' ');
+                for (const cls of classes) {
+                    if (colorMap[cls]) { newColor = colorMap[cls]; break; }
+                }
+            }
+            node.childNodes.forEach(child => traverse(child, newColor));
+        }
+    }
+
+    tempDiv.childNodes.forEach(child => traverse(child, 'D4D4D4'));
+
+    // Drop trailing blank lines
+    while (lines.length > 0 && lines[lines.length - 1].length === 0) lines.pop();
+
+    return lines.map(lineRuns => new docx.Paragraph({
+        children: lineRuns.length > 0 ? lineRuns : [new docx.TextRun({ text: ' ', font: 'Consolas', size: 18 })],
+        spacing: { before: 0, after: 0 }
+    }));
+}
+
 function parseGitHubUrl(url) {
     try {
         const urlObj = new URL(url);
@@ -58,10 +183,49 @@ function showError(msg) {
 
 function validateGenerateBtn() {
     const checkedCount = treeContainer.querySelectorAll('input[type="checkbox"]:checked').length;
-    generateBtn.disabled = (selectionMode.value === 'include' && checkedCount === 0);
+    const isSelectionEmpty = (selectionMode.value === 'include' && checkedCount === 0);
+    generateBtn.disabled = isSelectionEmpty;
+
+    if (!isSelectionEmpty || selectionMode.value === 'exclude') {
+        const selected = Array.from(treeContainer.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value);
+        const shouldIncludeImages = includeImagesToggle.checked;
+
+        let targetFiles = selectionMode.value === 'include'
+            ? allFiles.filter(f => selected.some(p => f.startsWith(p)))
+            : allFiles.filter(f => !selected.some(p => f.startsWith(p)));
+
+        if (!shouldIncludeImages) targetFiles = targetFiles.filter(f => !isImage(f));
+
+        // Dynamic file counter
+        genBtnText.textContent = `Generate Document (${targetFiles.length} files)`;
+    } else {
+        genBtnText.textContent = `Generate Document`;
+    }
+
+    updateSelectAllState();
 }
 
-// Generate an ASCII visual tree for Markdown exports
+function updateSelectAllState() {
+    const all = Array.from(treeContainer.querySelectorAll('input[type="checkbox"]'));
+    const files = all.filter(cb => !cb.value.endsWith('/'));
+    if (files.length === 0) return;
+    const checkedCount = files.filter(cb => cb.checked).length;
+    if (checkedCount === 0) {
+        selectAllBtn.indeterminate = false;
+        selectAllBtn.checked = false;
+    } else if (checkedCount === files.length) {
+        selectAllBtn.indeterminate = false;
+        selectAllBtn.checked = true;
+    } else {
+        selectAllBtn.indeterminate = true;
+        selectAllBtn.checked = false;
+    }
+}
+
+// Recalculate if these toggles change
+selectionMode.addEventListener('change', validateGenerateBtn);
+includeImagesToggle.addEventListener('change', validateGenerateBtn);
+
 function generateAsciiTree(paths) {
     const tree = {};
     paths.forEach(path => {
@@ -100,12 +264,21 @@ repoForm.addEventListener('submit', async (e) => {
         repoData.owner = owner;
         repoData.repo = repo;
 
-        const repoRes = await fetch(`https://api.github.com/repos/${owner}/${repo}`);
-        if (!repoRes.ok) throw new Error("Repository not found.");
+        const token = githubTokenInput.value.trim();
+        const headers = {};
+        if (token) headers['Authorization'] = `token ${token}`;
+
+        const repoRes = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers });
+        if (!repoRes.ok) {
+            if (repoRes.status === 403) throw new Error("GitHub API rate limit hit. Please provide a Personal Access Token.");
+            throw new Error("Repository not found or is private.");
+        }
+        
         const repoJson = await repoRes.json();
         repoData.branch = repoJson.default_branch;
 
-        const treeRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/${repoData.branch}?recursive=1`);
+        const treeRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/${repoData.branch}?recursive=1`, { headers });
+        if (!treeRes.ok) throw new Error("Failed to load repository tree. Check your token permissions.");
         const treeJson = await treeRes.json();
 
         allFiles = treeJson.tree
@@ -130,6 +303,9 @@ repoForm.addEventListener('submit', async (e) => {
 generateBtn.addEventListener('click', async () => {
     toggleLoadingState('gen', true);
     progressContainer.classList.remove('hidden');
+    progressBarFill.style.width = '0%';
+    progressCount.textContent = '0/0';
+    statusMessage.classList.add('hidden');
     const bodyChildren = [];
     const format = exportFormat.value;
     
@@ -144,7 +320,23 @@ generateBtn.addEventListener('click', async () => {
         if (!shouldIncludeImages) targetFiles = targetFiles.filter(f => !isImage(f));
         if (targetFiles.length === 0) throw new Error("No files selected to generate.");
 
-        // Document Intialization Setup
+        const token = githubTokenInput.value.trim();
+        
+        // --- Limit Catch & UI Redirect ---
+        if (targetFiles.length > 60 && !token) { // Changed to 60
+            selectionUI.classList.add('hidden');
+            homeScreen.classList.remove('hidden');
+            
+            tokenHintBox.classList.add('error-state');
+            // Changed "below" to "above", and made the token text a clickable link
+            hintBoxText.innerHTML = `<b>Limit Exceeded:</b> You selected ${targetFiles.length} files. Please paste a <a href="https://github.com/settings/tokens" target="_blank">GitHub Token</a> above.`;
+            githubTokenInput.focus();
+            
+            toggleLoadingState('gen', false);
+            progressContainer.classList.add('hidden');
+            return; 
+        }
+
         let mdContent = `# Project Codebase: ${repoData.repo}\n**Repository:** https://github.com/${repoData.owner}/${repoData.repo}\n\n`;
         
         if (format === 'docx') {
@@ -163,7 +355,21 @@ generateBtn.addEventListener('click', async () => {
             const batchResults = await Promise.all(batch.map(async (path) => {
                 const rawUrl = `https://raw.githubusercontent.com/${repoData.owner}/${repoData.repo}/${repoData.branch}/${path}`;
                 try {
-                    const res = await fetch(rawUrl);
+                    let res;
+                    if (token) {
+                        // raw.githubusercontent.com rejects the Authorization header via CORS.
+                        // Use the GitHub API with the raw media type instead — it supports auth + CORS.
+                        const encodedPath = path.split('/').map(encodeURIComponent).join('/');
+                        const apiUrl = `https://api.github.com/repos/${repoData.owner}/${repoData.repo}/contents/${encodedPath}?ref=${repoData.branch}`;
+                        res = await fetch(apiUrl, {
+                            headers: {
+                                'Authorization': `token ${token}`,
+                                'Accept': 'application/vnd.github.v3.raw'
+                            }
+                        });
+                    } else {
+                        res = await fetch(rawUrl);
+                    }
                     if (!res.ok) return null;
 
                     processed++;
@@ -171,7 +377,7 @@ generateBtn.addEventListener('click', async () => {
                     progressBarFill.style.width = `${(processed / targetFiles.length) * 100}%`;
 
                     if (isImage(path)) {
-                        if (format === 'md') return { type: 'image', path, url: rawUrl }; // MD just needs the link
+                        if (format === 'md') return { type: 'image', path, url: rawUrl };
                         const buffer = await res.arrayBuffer();
                         return { type: 'image', path, buffer };
                     } else {
@@ -189,34 +395,73 @@ generateBtn.addEventListener('click', async () => {
                 if (!fileData) continue;
 
                 if (format === 'md') {
-                    // MARKDOWN COMPILATION
                     mdContent += `## ${fileData.path}\n\n`;
                     if (fileData.type === 'image') {
                         mdContent += `![${fileData.path.split('/').pop()}](${encodeURI(fileData.url)})\n\n`;
                     } else {
-                        const ext = fileData.path.split('.').pop();
+                        const ext = fileData.path.split('.').pop() || 'txt';
                         mdContent += `\`\`\`${ext}\n${fileData.text}\n\`\`\`\n\n`;
                     }
                 } else {
                     // WORD COMPILATION
                     bodyChildren.push(new docx.Paragraph({ text: fileData.path, heading: docx.HeadingLevel.HEADING_2, spacing: { before: 400, after: 200 }}));
+                    
                     if (fileData.type === 'image') {
                         bodyChildren.push(new docx.Paragraph({ children: [new docx.ImageRun({ data: fileData.buffer, transformation: { width: 400, height: 300 } })] }));
                     } else {
-                        const paragraphs = [];
+                        let paragraphs;
+
                         if (fileData.text.length > 30000) {
-                            paragraphs.push(new docx.Paragraph({ children: [new docx.TextRun({ text: "/* File too large for formatting. Rendered as raw text. */\n\n" + fileData.text, font: "Consolas", size: 18 })] }));
+                            paragraphs = [new docx.Paragraph({
+                                children: [new docx.TextRun({ text: '/* File too large for syntax highlighting — raw text */', color: '6A9955', font: 'Consolas', size: 18 })],
+                                spacing: { before: 0, after: 0 }
+                            })];
+                            for (const line of fileData.text.split(/\r?\n/)) {
+                                const preserved = line.replace(/^ +/g, m => ' '.repeat(m.length));
+                                paragraphs.push(new docx.Paragraph({
+                                    children: [new docx.TextRun({ text: preserved || ' ', color: 'D4D4D4', font: 'Consolas', size: 18 })],
+                                    spacing: { before: 0, after: 0 }
+                                }));
+                            }
                         } else {
-                            paragraphs.push(new docx.Paragraph({ children: [new docx.TextRun({ text: fileData.text, font: "Consolas", size: 18 })] }));
+                            paragraphs = getHighlightedWordParagraphs(fileData.text, fileData.path);
                         }
-                        bodyChildren.push(new docx.Table({ width: { size: 100, type: docx.WidthType.PERCENTAGE }, rows: [new docx.TableRow({ children: [new docx.TableCell({ shading: { fill: "F6F8FA" }, children: paragraphs })] })] }));
+
+                        const noBorder = { style: "none", size: 0, color: "auto" };
+                        const allNone = { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder, insideH: noBorder, insideV: noBorder };
+                        const tabName = fileData.path.split('/').pop();
+
+                        bodyChildren.push(new docx.Table({
+                            width: { size: 100, type: docx.WidthType.PERCENTAGE },
+                            borders: allNone,
+                            rows: [
+                                new docx.TableRow({
+                                    children: [new docx.TableCell({
+                                        shading: { fill: '2D2D2D' },
+                                        borders: allNone,
+                                        margins: { top: 80, bottom: 80, left: 180, right: 180 },
+                                        children: [new docx.Paragraph({
+                                            children: [new docx.TextRun({ text: tabName, color: 'CCCCCC', font: 'Consolas', size: 17 })],
+                                            spacing: { before: 0, after: 0 }
+                                        })]
+                                    })]
+                                }),
+                                new docx.TableRow({
+                                    children: [new docx.TableCell({
+                                        shading: { fill: '1E1E1E' },
+                                        borders: allNone,
+                                        margins: { top: 120, bottom: 160, left: 180, right: 180 },
+                                        children: paragraphs
+                                    })]
+                                })
+                            ]
+                        }));
                     }
                     bodyChildren.push(new docx.Paragraph({ text: "" }));
                 }
             }
         }
 
-        // Final Download Trigger
         if (format === 'docx') {
             const doc = new docx.Document({ sections: [{ children: bodyChildren }] });
             const blob = await docx.Packer.toBlob(doc);
