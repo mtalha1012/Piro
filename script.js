@@ -31,8 +31,11 @@ let exportFormatVal = localStorage.getItem('piro_exportFormat') || 'docx';
 let includeImagesVal = localStorage.getItem('piro_includeImages') !== 'no'; // Defaults to true ('yes')
 let codeThemeVal = localStorage.getItem('piro_theme') || 'dark';
 
+// Updated Extensions Lists
 const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.bmp'];
-const BINARY_EXTENSIONS = ['.mp4', '.mp3', '.wav', '.zip', '.pdf', '.exe', '.pyc', '.ttf', '.woff', '.woff2', '.svg', '.ico', '.eot', '.dll', '.bin', '.apk'];
+const BINARY_EXTENSIONS = ['.mp4', '.mp3', '.wav', '.zip', '.pdf', '.exe', '.pyc', '.ttf', '.woff', '.woff2', '.svg', '.ico', '.eot', '.dll', '.bin', '.class', '.jar', '.lock', '.apk'];
+const IGNORED_EXTENSIONS = ['.iml', '.lock', '.name'];
+const IGNORED_FILES = ['.gitignore', '.DS_Store', 'package-lock.json', 'yarn.lock', 'LICENSE'];
 
 const isImage = (path) => IMAGE_EXTENSIONS.some(ext => path.toLowerCase().endsWith(ext));
 const isBinary = (path) => BINARY_EXTENSIONS.some(ext => path.toLowerCase().endsWith(ext));
@@ -255,6 +258,7 @@ function validateGenerateBtn() {
     const count = targetFiles.length;
     const tokenVal = githubTokenInput.value.trim();
 
+    // The >150 Limit Logic
     if (count > 150) {
         tokenSection.classList.remove('hidden'); // Slide down the token UI
         if (!tokenVal) {
@@ -317,7 +321,7 @@ backBtn.addEventListener('click', () => {
     statusMessage.classList.add('hidden');
 });
 
-// Phase 1: Fetch Repo
+// --- Phase 1: Fetch Repo ---
 repoForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     toggleLoadingState('fetch', true);
@@ -344,7 +348,32 @@ repoForm.addEventListener('submit', async (e) => {
         const treeJson = await treeRes.json();
 
         allFiles = treeJson.tree
-            .filter(item => item.type === 'blob' && !isBinary(item.path))
+            .filter(item => {
+                // 1. Must be a file
+                if (item.type !== 'blob') return false;
+                
+                // 2. Must not be a binary extension
+                if (isBinary(item.path)) return false;
+
+                // 3. Must not be a junk folder (.git, node_modules, etc)
+                const parts = item.path.split('/');
+                const isJunkFolder = parts.some(part => 
+                    (part.startsWith('.') && part !== '.github') || 
+                    part === 'node_modules' || 
+                    part === 'build' ||
+                    part === 'target'
+                );
+                if (isJunkFolder) return false;
+
+                // 4. Must not be useless metadata/config files
+                const fileName = parts[parts.length - 1];
+                if (IGNORED_FILES.includes(fileName)) return false;
+                
+                const ext = fileName.substring(fileName.lastIndexOf('.')).toLowerCase();
+                if (IGNORED_EXTENSIONS.includes(ext)) return false;
+
+                return true;
+            })
             .map(item => item.path);
         
         displayRepoName.textContent = `${owner} / ${repo}`;
@@ -382,15 +411,32 @@ generateBtn.addEventListener('click', async () => {
         if (targetFiles.length === 0) throw new Error("No files selected to generate.");
 
         const token = githubTokenInput.value.trim();
+        const treeText = generateAsciiTree(targetFiles);
 
         let mdContent = `# Project Codebase: ${repoData.repo}\n**Repository:** https://github.com/${repoData.owner}/${repoData.repo}\n\n`;
         
         if (format === 'docx') {
             bodyChildren.push(new docx.Paragraph({ text: `Project Codebase: ${repoData.repo}`, heading: docx.HeadingLevel.TITLE, alignment: docx.AlignmentType.CENTER, spacing: { before: 2000, after: 400 }}));
             bodyChildren.push(new docx.Paragraph({ text: `Repository: https://github.com/${repoData.owner}/${repoData.repo}`, alignment: docx.AlignmentType.CENTER }));
+            
+            // Inject ASCII Tree into Docx
+            bodyChildren.push(new docx.Paragraph({
+                children: [
+                    new docx.TextRun({ text: "Project Structure", bold: true, size: 28 }),
+                    ...treeText.split('\n').map(line => 
+                        new docx.TextRun({ 
+                            text: line, 
+                            break: 1, 
+                            font: "Consolas" 
+                        })
+                    )
+                ],
+                spacing: { after: 400 }
+            }));
+
             bodyChildren.push(new docx.Paragraph({ text: "", pageBreakBefore: true }));
         } else {
-            mdContent += `## Repository Structure\n\`\`\`text\n${generateAsciiTree(targetFiles)}\n\`\`\`\n\n`;
+            mdContent += `## Repository Structure\n\`\`\`text\n${treeText}\n\`\`\`\n\n`;
         }
 
         let processed = 0;
@@ -403,6 +449,7 @@ generateBtn.addEventListener('click', async () => {
                 try {
                     let res;
                     if (token) {
+                        // raw.githubusercontent.com blocks Authorization via CORS — use the API with raw media type instead
                         const encodedPath = path.split('/').map(encodeURIComponent).join('/');
                         const apiUrl = `https://api.github.com/repos/${repoData.owner}/${repoData.repo}/contents/${encodedPath}?ref=${repoData.branch}`;
                         res = await fetch(apiUrl, {
@@ -420,6 +467,7 @@ generateBtn.addEventListener('click', async () => {
                         if (res.status === 403 || res.status === 429) {
                             throw new Error("GitHub download limit exceeded during generation. Please provide a token to continue.");
                         }
+                        // For generic 404s or weird files, just skip them so the whole app doesn't crash
                         console.warn(`Skipping file (HTTP ${res.status}): ${path}`);
                         return null; 
                     }
@@ -434,14 +482,15 @@ generateBtn.addEventListener('click', async () => {
                         return { type: 'image', path, buffer };
                     } else {
                         const text = await res.text();
-                    
-                        // If it contains null bytes or invalid UTF-8 replacement characters, it's binary junk.
+                        
+                        // DYNAMIC UTF-8 / BINARY CHECK
                         if (text.includes('\x00') || text.includes('\uFFFD')) {
                             console.warn(`Skipped ${path} - Detected as non-UTF-8 binary content.`);
-                            return null; // Skips the file entirely
+                            return null;
                         }
-                        
-                        const cleanText = text.replace(/[\x01-\x08\x0B\x0C\x0E-\x1F]/g, '');
+
+                        // Sanitize to prevent Apple/Word corruption
+                        const cleanText = text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
                         return { type: 'text', path, text: cleanText };
                     }
                 } catch (e) {
