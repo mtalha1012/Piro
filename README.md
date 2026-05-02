@@ -1,43 +1,45 @@
-# Piro 🧵
-**Stitching Code into Context.**
+# Piro | Stitching Code into Context
 
-Piro is a lightning-fast, 100% client-side web application designed to solve a classic developer pain point: compiling codebases into readable documents. It is built primarily to help Computer Science students instantly generate beautifully formatted, syntax-highlighted `.docx` code appendices for their university project reports. 
+![Piro Banner](logo.png) 
 
-Additionally, it features a `.md` export engine to feed massive repositories into Large Language Models for codebase analysis.
+**Piro** is a 100% client-side web application designed to completely automate the tedious process of converting GitHub repositories into readable, formatted documents. 
 
-Built entirely on the frontend, Piro bypasses traditional backend bottlenecks by fetching repository "Zipballs" and compiling documents locally in your browser memory. This guarantees total data privacy, zero server costs, and lightning-fast generation.
+Whether you are a Computer Science student compiling 50 source files into a Microsoft Word (`.docx`) report for a final project, or a developer trying to feed an entire codebase into an LLM (like ChatGPT or Claude) via Markdown (`.md`), Piro does the heavy lifting in seconds.
 
----
+## 🚀 Live Demo
+**Try it directly in your browser:** [Insert Live GitHub Pages Link Here]
 
-## ✨ Features
+## ✨ Key Features
 
-* **Zero Backend, Infinite Scaling:** Everything happens in your browser. No server timeouts, no database, no backend compute limits.
-* **Zipball Architecture:** Bypasses strict GitHub API rate limits by downloading the entire repository as a single ZIP file, allowing unauthenticated users to process massive repositories instantly.
-* **Interactive File Selection:** A native-feeling GitHub file tree with "Include/Exclude" toggles, folder collapsing, and `Shift+Click` bulk selection.
-* **Local Syntax Highlighting:** Powered by `highlight.js`, preserving language-specific syntax colors (VS Code Dark theme) natively inside the Word document.
-* **Smart Asset Handling:** Automatically filters out binary noise (audio, video, compiled files) but correctly parses and scales valid image assets (`.png`, `.jpg`, etc.) to fit neatly within Word document margins.
-* **ASCII Tree Generation:** Automatically generates and prepends a beautiful, monospaced ASCII visual map of your selected repository structure.
-
-## 🚀 How It Works
-
-1. **Connect:** Paste a public GitHub URL. Piro makes a single API call to map the repository tree structure.
-2. **Select:** Use the UI to check/uncheck the specific files or folders you want to include in your document.
-3. **Stitch:** Piro downloads the repository archive (`JSZip`), colorizes the code locally (`highlight.js`), constructs the Word document natively (`docx.js`), and triggers a local download.
+* **Instant Document Generation (.docx):** Compiles selected codebase files into a single, clean Microsoft Word document.
+* **Flawless Syntax Highlighting:** Replicates the VS Code experience directly inside Word with dynamic Dark and Light themes.
+* **AI Context Export (.md):** Instantly stitch your entire repository into a flat Markdown file—the most token-efficient format for feeding large codebases into AI context windows.
+* **Interactive File Tree:** Fetch any public repository and use the graphical file tree to precisely include or exclude specific files and folders.
+* **100% Serverless Architecture:** Everything runs locally in your browser. There is no backend, no database, no sign-ups, and no code ever leaves your machine.
+* **Cross-Platform Resiliency:** Documents are strictly sanitized at the byte level to prevent XML corruption, ensuring the `.docx` files open perfectly on Windows, macOS, and iOS.
+* **Personal Access Token Support:** Seamlessly bypass GitHub's 60-request/hour unauthenticated API limit for massive repositories by providing a local-only token.
 
 ## 🛠️ Tech Stack
 
-Piro is built using pure, Vanilla web technologies to ensure it can be hosted anywhere for $0.
+Piro was built as a lightweight, lightning-fast vanilla web app. 
+* **Frontend:** HTML5, CSS3, Vanilla JavaScript (ES6+)
+* **APIs:** GitHub REST API (Trees, Contents)
+* **Libraries:**
+  * [`docx`](https://docx.js.org/) - For client-side Word document generation.
+  * [`highlight.js`](https://highlightjs.org/) - For precise, multi-language syntax parsing.
+  * [`FileSaver.js`](https://github.com/eligrey/FileSaver.js/) - For triggering local file downloads.
 
-* **HTML5 / CSS3 / Vanilla JavaScript**
-* **[JSZip](https://stuk.github.io/jszip/):** In-browser zip extraction.
-* **[highlight.js](https://highlightjs.org/):** Client-side syntax colorization.
-* **[docx.js](https://docx.js.org/):** Programmatic Word document assembly.
-* **[FileSaver.js](https://github.com/eligrey/FileSaver.js/):** Client-side file saving.
+## ⚙️ How It Works (The Architecture)
 
-## 💻 Local Development
+Piro operates in a two-phase client-side pipeline:
 
-Because Piro is a fully frontend application, there are no dependencies to install or servers to configure. 
+1. **Mapping (Phase 1):** The app makes a `recursive=1` call to the GitHub API to fetch the complete directory tree. It filters out binary files (like `.exe`, `.mp4`) and unsupported images, then dynamically renders an interactive DOM tree for the user.
+2. **Stitching (Phase 2):** Based on the user's selection, Piro batches raw file requests. For Word exports, the code is parsed by `highlight.js` to assign color classes, which are then mapped to `docx` TextRuns to preserve indentation and color. For Markdown exports, it simply concatenates the raw text wrapped in appropriate language backticks. 
+
+## 💻 Local Setup
+
+Since Piro has no backend, running it locally is incredibly simple.
 
 1. Clone the repository:
    ```bash
-   git clone [https://github.com/yourusername/piro.git](https://github.com/yourusername/piro.git)
+   git clone [https://github.com/mtalha1012/piro.git](https://github.com/mtalha1012/piro.git)
