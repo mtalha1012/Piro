@@ -32,7 +32,7 @@ let includeImagesVal = localStorage.getItem('piro_includeImages') !== 'no'; // D
 let codeThemeVal = localStorage.getItem('piro_theme') || 'dark';
 
 const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.bmp'];
-const BINARY_EXTENSIONS = ['.mp4', '.mp3', '.wav', '.zip', '.pdf', '.exe', '.pyc', '.ttf', '.woff', '.woff2', '.svg', '.ico', '.eot', '.dll'];
+const BINARY_EXTENSIONS = ['.mp4', '.mp3', '.wav', '.zip', '.pdf', '.exe', '.pyc', '.ttf', '.woff', '.woff2', '.svg', '.ico', '.eot', '.dll', '.bin'];
 
 const isImage = (path) => IMAGE_EXTENSIONS.some(ext => path.toLowerCase().endsWith(ext));
 const isBinary = (path) => BINARY_EXTENSIONS.some(ext => path.toLowerCase().endsWith(ext));
@@ -434,7 +434,14 @@ generateBtn.addEventListener('click', async () => {
                         return { type: 'image', path, buffer };
                     } else {
                         const text = await res.text();
-                        const cleanText = text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
+                    
+                        // If it contains null bytes or invalid UTF-8 replacement characters, it's binary junk.
+                        if (text.includes('\x00') || text.includes('\uFFFD')) {
+                            console.warn(`Skipped ${path} - Detected as non-UTF-8 binary content.`);
+                            return null; // Skips the file entirely
+                        }
+                        
+                        const cleanText = text.replace(/[\x01-\x08\x0B\x0C\x0E-\x1F]/g, '');
                         return { type: 'text', path, text: cleanText };
                     }
                 } catch (e) {
