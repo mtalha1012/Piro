@@ -18,7 +18,6 @@ const backBtn = document.getElementById('backBtn');
 const displayRepoName = document.getElementById('displayRepoName');
 const includeImagesToggle = document.getElementById('includeImages');
 
-// Progress Bar
 const progressContainer = document.getElementById('progressContainer');
 const progressCount = document.getElementById('progressCount');
 const progressBarFill = document.getElementById('progressBarFill');
@@ -34,18 +33,15 @@ const BINARY_EXTENSIONS = ['.mp4', '.mp3', '.wav', '.zip', '.pdf', '.exe', '.pyc
 const isImage = (path) => IMAGE_EXTENSIONS.some(ext => path.toLowerCase().endsWith(ext));
 const isBinary = (path) => BINARY_EXTENSIONS.some(ext => path.toLowerCase().endsWith(ext));
 
-// --- Feature: Bulletproof Autocomplete (Tab or Right Arrow) ---
+// --- Autocomplete: Tab or Right Arrow fills 'https://github.com/' ---
 repoUrlInput.addEventListener('keydown', function(e) {
     if (e.key === 'ArrowRight' || e.key === 'Tab') {
         const currentVal = this.value.trim().toLowerCase();
         const targetUrl = 'https://github.com/';
         
-        // Only trigger if they haven't finished the base URL yet
         if (currentVal !== targetUrl && (currentVal === '' || targetUrl.startsWith(currentVal))) {
-            e.preventDefault(); // Stop browser from jumping to the next box
+            e.preventDefault(); // prevents Tab from jumping to the next field
             this.value = targetUrl;
-            
-            // Push the cursor to the very end of the newly inserted text
             setTimeout(() => {
                 this.selectionStart = this.selectionEnd = this.value.length;
             }, 0);
@@ -53,7 +49,6 @@ repoUrlInput.addEventListener('keydown', function(e) {
     }
 });
 
-// Reset the error box if the user starts typing a token
 githubTokenInput.addEventListener('input', () => {
     if (tokenHintBox.classList.contains('error-state')) {
         tokenHintBox.classList.remove('error-state');
@@ -62,8 +57,6 @@ githubTokenInput.addEventListener('input', () => {
 });
 
 // --- Utility Functions ---
-// Parses highlight.js HTML into one docx.Paragraph per line, VS Code Dark+ colors.
-// Indentation is preserved by converting leading spaces to non-breaking spaces.
 function getHighlightedWordParagraphs(code, filename) {
     const ext = filename.split('.').pop().toLowerCase();
     const langMap = {
@@ -146,9 +139,7 @@ function getHighlightedWordParagraphs(code, filename) {
 
     tempDiv.childNodes.forEach(child => traverse(child, 'D4D4D4'));
 
-    // Drop trailing blank lines
     while (lines.length > 0 && lines[lines.length - 1].length === 0) lines.pop();
-
     return lines.map(lineRuns => new docx.Paragraph({
         children: lineRuns.length > 0 ? lineRuns : [new docx.TextRun({ text: ' ', font: 'Consolas', size: 18 })],
         spacing: { before: 0, after: 0 }
@@ -196,7 +187,6 @@ function validateGenerateBtn() {
 
         if (!shouldIncludeImages) targetFiles = targetFiles.filter(f => !isImage(f));
 
-        // Dynamic file counter
         genBtnText.textContent = `Generate Document (${targetFiles.length} files)`;
     } else {
         genBtnText.textContent = `Generate Document`;
@@ -222,7 +212,6 @@ function updateSelectAllState() {
     }
 }
 
-// Recalculate if these toggles change
 selectionMode.addEventListener('change', validateGenerateBtn);
 includeImagesToggle.addEventListener('change', validateGenerateBtn);
 
@@ -299,7 +288,7 @@ repoForm.addEventListener('submit', async (e) => {
     }
 });
 
-// --- Phase 2: Generate Document (HIGH SPEED BATCHING) ---
+// --- Phase 2: Generate Document ---
 generateBtn.addEventListener('click', async () => {
     toggleLoadingState('gen', true);
     progressContainer.classList.remove('hidden');
@@ -322,13 +311,10 @@ generateBtn.addEventListener('click', async () => {
 
         const token = githubTokenInput.value.trim();
         
-        // --- Limit Catch & UI Redirect ---
-        if (targetFiles.length > 60 && !token) { // Changed to 60
+        if (targetFiles.length > 60 && !token) {
             selectionUI.classList.add('hidden');
             homeScreen.classList.remove('hidden');
-            
             tokenHintBox.classList.add('error-state');
-            // Changed "below" to "above", and made the token text a clickable link
             hintBoxText.innerHTML = `<b>Limit Exceeded:</b> You selected ${targetFiles.length} files. Please paste a <a href="https://github.com/settings/tokens" target="_blank">GitHub Token</a> above.`;
             githubTokenInput.focus();
             
@@ -357,8 +343,7 @@ generateBtn.addEventListener('click', async () => {
                 try {
                     let res;
                     if (token) {
-                        // raw.githubusercontent.com rejects the Authorization header via CORS.
-                        // Use the GitHub API with the raw media type instead — it supports auth + CORS.
+                        // raw.githubusercontent.com blocks Authorization via CORS — use the API with raw media type instead
                         const encodedPath = path.split('/').map(encodeURIComponent).join('/');
                         const apiUrl = `https://api.github.com/repos/${repoData.owner}/${repoData.repo}/contents/${encodedPath}?ref=${repoData.branch}`;
                         res = await fetch(apiUrl, {
@@ -390,7 +375,6 @@ generateBtn.addEventListener('click', async () => {
                 }
             }));
 
-            // Stitch the batch
             for (const fileData of batchResults) {
                 if (!fileData) continue;
 
@@ -403,7 +387,6 @@ generateBtn.addEventListener('click', async () => {
                         mdContent += `\`\`\`${ext}\n${fileData.text}\n\`\`\`\n\n`;
                     }
                 } else {
-                    // WORD COMPILATION
                     bodyChildren.push(new docx.Paragraph({ text: fileData.path, heading: docx.HeadingLevel.HEADING_2, spacing: { before: 400, after: 200 }}));
                     
                     if (fileData.type === 'image') {
