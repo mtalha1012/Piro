@@ -1,7 +1,9 @@
-# Piro 🪡
+# Piro 🧵
 **Stitching Code into Context.**
 
-Piro is a blazing-fast, 100% client-side developer tool that selectively harvests code from any GitHub repository and transforms it into a structured, syntax-highlighted Word Document (`.docx`). 
+Piro is a lightning-fast, 100% client-side web application designed to solve a classic developer pain point: compiling codebases into readable documents. It is built primarily to help Computer Science students instantly generate beautifully formatted, syntax-highlighted `.docx` code appendices for their university project reports. 
+
+Additionally, it features a `.md` export engine to feed massive repositories into Large Language Models for codebase analysis.
 
 Built entirely on the frontend, Piro bypasses traditional backend bottlenecks by fetching repository "Zipballs" and compiling documents locally in your browser memory. This guarantees total data privacy, zero server costs, and lightning-fast generation.
 
