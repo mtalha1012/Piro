@@ -7,24 +7,25 @@
 }
 
 body {
-    background-color: #0f172a; 
-    color: #f8fafc;          
+    background-color: #0f172a;
+    color: #f8fafc;
     display: flex;
-    justify-content: center;
+    flex-direction: column;
     align-items: center;
-    height: 100vh; /* Changed from min-height */
+    min-height: 100vh;
     margin: 0;
-    padding: 0; /* Removed the padding causing the scroll */
+    padding: 0;
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
-    overflow-y: auto; /* Allows scrolling ONLY if the screen is super tiny */
+    overflow-y: auto;
 }
 
 .container {
     max-width: 650px;
     width: 100%;
-    padding: 1rem 2rem; /* Reduced vertical padding from 2rem */
+    padding: 1rem 2rem;
     text-align: center;
+    margin: auto;
 }
 
 /* -- Header & Branding -- */
@@ -222,8 +223,9 @@ button:disabled {
     transition: color 0.2s ease;
 }
 
-.back-link:hover { 
-    color: #f8fafc; 
+.back-link:hover:not(:disabled) {
+    background-color: transparent;
+    color: #f8fafc;
     text-decoration: underline;
     text-underline-offset: 4px;
 }
@@ -238,33 +240,89 @@ button:disabled {
     border: 1px solid #334155;
 }
 
-/* -- Settings Bar & Toggles -- */
+/* -- Mode Toggle Bar -- */
 .toggle-container {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 10px;
+    flex-direction: column;
+    gap: 8px;
     padding: 1rem 1.5rem;
     border-bottom: 1px solid #334155;
-    font-size: 0.85rem;
     background-color: #1e293b;
 }
 
-.setting-group {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    color: #e2e8f0;
+.mode-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #64748b;
 }
 
-.image-toggle label {
+/* -- Pill Groups -- */
+.pill-group {
+    display: flex;
+    background-color: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    overflow: hidden;
+    width: 100%;
+}
+
+.pill {
+    flex: 1;
+    padding: 0.45rem 1rem;
+    font-size: 0.82rem;
+    font-weight: 500;
+    background: none;
+    color: #64748b;
+    border: none;
+    border-radius: 0;
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.pill:hover:not(.active) {
+    background-color: #1e293b;
+    color: #94a3b8;
+}
+
+.pill.active {
+    background-color: #10b981;
+    color: #ffffff;
+    font-weight: 600;
+}
+
+/* -- Export Options Panel -- */
+.export-options {
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+    padding: 1rem 1.5rem;
+    background-color: #1e293b;
+    border-top: 1px solid #334155;
+}
+
+.option-row {
     display: flex;
     align-items: center;
-    gap: 8px;
-    cursor: pointer;
-    font-size: 0.85rem;
-    color: #e2e8f0;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.option-label {
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: #94a3b8;
+    min-width: 80px;
+}
+
+.option-row .pill-group {
+    flex: 1;
+}
+
+.option-row .pill {
+    padding: 0.35rem 0.75rem;
+    font-size: 0.8rem;
 }
 
 /* -- Bulk Actions -- */
@@ -542,6 +600,39 @@ input[type="password"]:focus {
     font-size: 0.75rem;
 }
 
+.token-details p {
+    margin-top: 8px;
+    color: #64748b; /* Slate-500 */
+    line-height: 1.5;
+}
+
+/* -- New Token Steps Styling -- */
+.token-steps {
+    margin-top: 8px;
+    font-size: 0.75rem;
+}
+
+.token-steps strong {
+    color: #cbd5e1; /* Slate-300 */
+    font-weight: 500;
+}
+
+.token-steps ol {
+    margin-top: 6px;
+    padding-left: 20px;
+    color: #64748b; /* Slate-500 */
+}
+
+.token-steps li {
+    margin-bottom: 4px;
+    line-height: 1.4;
+}
+
+.token-steps b {
+    color: #94a3b8; /* Slate-400 */
+    font-weight: 500;
+}
+
 .token-details summary {
     cursor: pointer;
     color: #94a3b8; /* Slate-400 */
@@ -596,4 +687,17 @@ input[type="password"]:focus {
 
 @media (pointer: coarse) {
     .tab-hint { display: none; }
+}
+
+.token-section {
+    margin: 0 1.5rem 1.5rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
 }
