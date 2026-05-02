@@ -11,12 +11,10 @@ const selectionUI = document.getElementById('selectionUI');
 const treeContainer = document.getElementById('treeContainer');
 const generateBtn = document.getElementById('generateBtn');
 const genBtnText = document.getElementById('genBtnText');
-const selectionMode = document.getElementById('selectionMode');
-const exportFormat = document.getElementById('exportFormat');
 const selectAllBtn = document.getElementById('selectAllBtn');
 const backBtn = document.getElementById('backBtn');
 const displayRepoName = document.getElementById('displayRepoName');
-const includeImagesToggle = document.getElementById('includeImages');
+const themeRow = document.getElementById('themeRow');
 
 const progressContainer = document.getElementById('progressContainer');
 const progressCount = document.getElementById('progressCount');
@@ -27,11 +25,64 @@ let repoData = { owner: '', repo: '', branch: '' };
 let allFiles = [];
 let lastCheckedNode = null;
 
+// Load saved preferences from the browser (or fallback to defaults)
+let selectionModeVal = localStorage.getItem('piro_selectionMode') || 'include';
+let exportFormatVal = localStorage.getItem('piro_exportFormat') || 'docx';
+let includeImagesVal = localStorage.getItem('piro_includeImages') !== 'no'; // Defaults to true ('yes')
+let codeThemeVal = localStorage.getItem('piro_theme') || 'dark';
+
 const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.svg', '.ico'];
 const BINARY_EXTENSIONS = ['.mp4', '.mp3', '.wav', '.zip', '.pdf', '.exe', '.pyc', '.ttf', '.woff', '.woff2'];
 
 const isImage = (path) => IMAGE_EXTENSIONS.some(ext => path.toLowerCase().endsWith(ext));
 const isBinary = (path) => BINARY_EXTENSIONS.some(ext => path.toLowerCase().endsWith(ext));
+
+// --- Pill Group Setup & Persistence ---
+function setupPillGroup(groupId, storageKey, initialValue, onChange) {
+    const group = document.getElementById(groupId);
+    if (!group) return;
+
+    // 1. Sync UI with the loaded preference on startup
+    group.querySelectorAll('.pill').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.value === initialValue);
+    });
+
+    // 2. Add Event Listeners to save the new choice when clicked
+    group.querySelectorAll('.pill').forEach(btn => {
+        btn.addEventListener('click', () => {
+            group.querySelectorAll('.pill').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            
+            const val = btn.dataset.value;
+            localStorage.setItem(storageKey, val); // Save to browser memory
+            onChange(val);
+        });
+    });
+}
+
+// Initialize the pill groups with their loaded values and save keys
+setupPillGroup('selectionModeGroup', 'piro_selectionMode', selectionModeVal, val => { 
+    selectionModeVal = val; 
+    validateGenerateBtn(); 
+});
+
+setupPillGroup('exportFormatGroup', 'piro_exportFormat', exportFormatVal, val => {
+    exportFormatVal = val;
+    themeRow.style.display = val === 'docx' ? 'flex' : 'none';
+    validateGenerateBtn();
+});
+
+setupPillGroup('imagesGroup', 'piro_includeImages', includeImagesVal ? 'yes' : 'no', val => { 
+    includeImagesVal = val === 'yes'; 
+    validateGenerateBtn(); 
+});
+
+setupPillGroup('themeGroup', 'piro_theme', codeThemeVal, val => { 
+    codeThemeVal = val; 
+});
+
+// Initial UI toggle: Hide the theme row on startup if Markdown was the saved preference
+themeRow.style.display = exportFormatVal === 'docx' ? 'flex' : 'none';
 
 // --- Autocomplete: Tab or Right Arrow fills 'https://github.com/' ---
 repoUrlInput.addEventListener('keydown', function(e) {
@@ -49,15 +100,14 @@ repoUrlInput.addEventListener('keydown', function(e) {
     }
 });
 
+const tokenSection = document.getElementById('tokenSection');
+
 githubTokenInput.addEventListener('input', () => {
-    if (tokenHintBox.classList.contains('error-state')) {
-        tokenHintBox.classList.remove('error-state');
-        hintBoxText.innerHTML = `Provide a <a href="https://github.com/settings/tokens" target="_blank">GitHub Token</a> to export >60 files.`;
-    }
+    validateGenerateBtn();
 });
 
 // --- Utility Functions ---
-function getHighlightedWordParagraphs(code, filename) {
+function getHighlightedWordParagraphs(code, filename, theme = 'dark') {
     const ext = filename.split('.').pop().toLowerCase();
     const langMap = {
         'cpp': 'cpp', 'c': 'c', 'h': 'cpp', 'hpp': 'cpp', 'cc': 'cpp',
@@ -86,7 +136,7 @@ function getHighlightedWordParagraphs(code, filename) {
     const tempDiv = document.createElement('pre');
     tempDiv.innerHTML = highlightedHtml;
 
-    const colorMap = {
+    const darkColorMap = {
         'hljs-keyword': '569CD6',
         'hljs-built_in': '4EC9B0',
         'hljs-type': '4EC9B0',
@@ -103,6 +153,27 @@ function getHighlightedWordParagraphs(code, filename) {
         'hljs-meta': 'C586C0',
         'hljs-literal': '569CD6'
     };
+
+    const lightColorMap = {
+        'hljs-keyword': '0000FF',
+        'hljs-built_in': '267F99',
+        'hljs-type': '267F99',
+        'hljs-title': '795E26',
+        'hljs-title.class': '267F99',
+        'hljs-title.function': '795E26',
+        'hljs-string': 'A31515',
+        'hljs-number': '098658',
+        'hljs-comment': '008000',
+        'hljs-variable': '001080',
+        'hljs-params': '001080',
+        'hljs-property': '001080',
+        'hljs-attr': 'E50000',
+        'hljs-meta': 'AF00DB',
+        'hljs-literal': '0000FF'
+    };
+
+    const colorMap = theme === 'dark' ? darkColorMap : lightColorMap;
+    const defaultColor = theme === 'dark' ? 'D4D4D4' : '1E1E1E';
 
     const lines = [[]];
 
@@ -137,7 +208,7 @@ function getHighlightedWordParagraphs(code, filename) {
         }
     }
 
-    tempDiv.childNodes.forEach(child => traverse(child, 'D4D4D4'));
+    tempDiv.childNodes.forEach(child => traverse(child, defaultColor));
 
     while (lines.length > 0 && lines[lines.length - 1].length === 0) lines.pop();
     return lines.map(lineRuns => new docx.Paragraph({
@@ -173,23 +244,31 @@ function showError(msg) {
 }
 
 function validateGenerateBtn() {
-    const checkedCount = treeContainer.querySelectorAll('input[type="checkbox"]:checked').length;
-    const isSelectionEmpty = (selectionMode.value === 'include' && checkedCount === 0);
-    generateBtn.disabled = isSelectionEmpty;
+    const selected = Array.from(treeContainer.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value);
 
-    if (!isSelectionEmpty || selectionMode.value === 'exclude') {
-        const selected = Array.from(treeContainer.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value);
-        const shouldIncludeImages = includeImagesToggle.checked;
+    let targetFiles = selectionModeVal === 'include'
+        ? allFiles.filter(f => selected.some(p => f.startsWith(p)))
+        : allFiles.filter(f => !selected.some(p => f.startsWith(p)));
 
-        let targetFiles = selectionMode.value === 'include'
-            ? allFiles.filter(f => selected.some(p => f.startsWith(p)))
-            : allFiles.filter(f => !selected.some(p => f.startsWith(p)));
+    if (!includeImagesVal) targetFiles = targetFiles.filter(f => !isImage(f));
 
-        if (!shouldIncludeImages) targetFiles = targetFiles.filter(f => !isImage(f));
+    const count = targetFiles.length;
+    const tokenVal = githubTokenInput.value.trim();
 
-        genBtnText.textContent = `Generate Document (${targetFiles.length} files)`;
+    // The >150 Limit Logic
+    if (count > 150) {
+        tokenSection.classList.remove('hidden'); // Slide down the token UI
+        if (!tokenVal) {
+            generateBtn.disabled = true;
+            genBtnText.textContent = `Token Required (${count} files)`;
+        } else {
+            generateBtn.disabled = false;
+            genBtnText.textContent = `Generate Document (${count} files)`;
+        }
     } else {
-        genBtnText.textContent = `Generate Document`;
+        tokenSection.classList.add('hidden'); // Hide the token UI
+        generateBtn.disabled = count === 0;
+        genBtnText.textContent = count === 0 ? 'Generate Document' : `Generate Document (${count} files)`;
     }
 
     updateSelectAllState();
@@ -211,9 +290,6 @@ function updateSelectAllState() {
         selectAllBtn.checked = false;
     }
 }
-
-selectionMode.addEventListener('change', validateGenerateBtn);
-includeImagesToggle.addEventListener('change', validateGenerateBtn);
 
 function generateAsciiTree(paths) {
     const tree = {};
@@ -253,9 +329,7 @@ repoForm.addEventListener('submit', async (e) => {
         repoData.owner = owner;
         repoData.repo = repo;
 
-        const token = githubTokenInput.value.trim();
         const headers = {};
-        if (token) headers['Authorization'] = `token ${token}`;
 
         const repoRes = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers });
         if (!repoRes.ok) {
@@ -296,32 +370,19 @@ generateBtn.addEventListener('click', async () => {
     progressCount.textContent = '0/0';
     statusMessage.classList.add('hidden');
     const bodyChildren = [];
-    const format = exportFormat.value;
-    
+    const format = exportFormatVal;
+
     try {
         const selected = Array.from(treeContainer.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value);
-        const shouldIncludeImages = includeImagesToggle.checked;
 
-        let targetFiles = selectionMode.value === 'include' 
+        let targetFiles = selectionModeVal === 'include'
             ? allFiles.filter(f => selected.some(p => f.startsWith(p)))
             : allFiles.filter(f => !selected.some(p => f.startsWith(p)));
 
-        if (!shouldIncludeImages) targetFiles = targetFiles.filter(f => !isImage(f));
+        if (!includeImagesVal) targetFiles = targetFiles.filter(f => !isImage(f));
         if (targetFiles.length === 0) throw new Error("No files selected to generate.");
 
         const token = githubTokenInput.value.trim();
-        
-        if (targetFiles.length > 60 && !token) {
-            selectionUI.classList.add('hidden');
-            homeScreen.classList.remove('hidden');
-            tokenHintBox.classList.add('error-state');
-            hintBoxText.innerHTML = `<b>Limit Exceeded:</b> You selected ${targetFiles.length} files. Please paste a <a href="https://github.com/settings/tokens" target="_blank">GitHub Token</a> above.`;
-            githubTokenInput.focus();
-            
-            toggleLoadingState('gen', false);
-            progressContainer.classList.add('hidden');
-            return; 
-        }
 
         let mdContent = `# Project Codebase: ${repoData.repo}\n**Repository:** https://github.com/${repoData.owner}/${repoData.repo}\n\n`;
         
@@ -355,7 +416,16 @@ generateBtn.addEventListener('click', async () => {
                     } else {
                         res = await fetch(rawUrl);
                     }
-                    if (!res.ok) return null;
+                    
+                    if (!res.ok) {
+                        // 403 (Rate Limit) or 429 (Too Many Requests)
+                        if (res.status === 403 || res.status === 429) {
+                            throw new Error("GitHub download limit exceeded during generation. Please provide a token to continue.");
+                        }
+                        // For generic 404s or weird files, just skip them so the whole app doesn't crash
+                        console.warn(`Skipping file (HTTP ${res.status}): ${path}`);
+                        return null; 
+                    }
 
                     processed++;
                     progressCount.textContent = `${processed}/${targetFiles.length}`;
@@ -396,18 +466,18 @@ generateBtn.addEventListener('click', async () => {
 
                         if (fileData.text.length > 30000) {
                             paragraphs = [new docx.Paragraph({
-                                children: [new docx.TextRun({ text: '/* File too large for syntax highlighting — raw text */', color: '6A9955', font: 'Consolas', size: 18 })],
+                                children: [new docx.TextRun({ text: '/* File too large for syntax highlighting — raw text */', color: codeThemeVal === 'dark' ? '6A9955' : '008000', font: 'Consolas', size: 18 })],
                                 spacing: { before: 0, after: 0 }
                             })];
                             for (const line of fileData.text.split(/\r?\n/)) {
                                 const preserved = line.replace(/^ +/g, m => ' '.repeat(m.length));
                                 paragraphs.push(new docx.Paragraph({
-                                    children: [new docx.TextRun({ text: preserved || ' ', color: 'D4D4D4', font: 'Consolas', size: 18 })],
+                                    children: [new docx.TextRun({ text: preserved || ' ', color: codeThemeVal === 'dark' ? 'D4D4D4' : '1E1E1E', font: 'Consolas', size: 18 })],
                                     spacing: { before: 0, after: 0 }
                                 }));
                             }
                         } else {
-                            paragraphs = getHighlightedWordParagraphs(fileData.text, fileData.path);
+                            paragraphs = getHighlightedWordParagraphs(fileData.text, fileData.path, codeThemeVal);
                         }
 
                         const noBorder = { style: "none", size: 0, color: "auto" };
@@ -420,18 +490,18 @@ generateBtn.addEventListener('click', async () => {
                             rows: [
                                 new docx.TableRow({
                                     children: [new docx.TableCell({
-                                        shading: { fill: '2D2D2D' },
+                                        shading: { fill: codeThemeVal === 'dark' ? '2D2D2D' : 'E8E8E8' },
                                         borders: allNone,
                                         margins: { top: 80, bottom: 80, left: 180, right: 180 },
                                         children: [new docx.Paragraph({
-                                            children: [new docx.TextRun({ text: tabName, color: 'CCCCCC', font: 'Consolas', size: 17 })],
+                                            children: [new docx.TextRun({ text: tabName, color: codeThemeVal === 'dark' ? 'CCCCCC' : '555555', font: 'Consolas', size: 17 })],
                                             spacing: { before: 0, after: 0 }
                                         })]
                                     })]
                                 }),
                                 new docx.TableRow({
                                     children: [new docx.TableCell({
-                                        shading: { fill: '1E1E1E' },
+                                        shading: { fill: codeThemeVal === 'dark' ? '1E1E1E' : 'F8F8F8' },
                                         borders: allNone,
                                         margins: { top: 120, bottom: 160, left: 180, right: 180 },
                                         children: paragraphs
