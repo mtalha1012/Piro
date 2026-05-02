@@ -31,8 +31,8 @@ let exportFormatVal = localStorage.getItem('piro_exportFormat') || 'docx';
 let includeImagesVal = localStorage.getItem('piro_includeImages') !== 'no'; // Defaults to true ('yes')
 let codeThemeVal = localStorage.getItem('piro_theme') || 'dark';
 
-const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.svg', '.ico'];
-const BINARY_EXTENSIONS = ['.mp4', '.mp3', '.wav', '.zip', '.pdf', '.exe', '.pyc', '.ttf', '.woff', '.woff2'];
+const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.bmp'];
+const BINARY_EXTENSIONS = ['.mp4', '.mp3', '.wav', '.zip', '.pdf', '.exe', '.pyc', '.ttf', '.woff', '.woff2', '.svg', '.ico', '.eot', '.dll'];
 
 const isImage = (path) => IMAGE_EXTENSIONS.some(ext => path.toLowerCase().endsWith(ext));
 const isBinary = (path) => BINARY_EXTENSIONS.some(ext => path.toLowerCase().endsWith(ext));
@@ -255,7 +255,6 @@ function validateGenerateBtn() {
     const count = targetFiles.length;
     const tokenVal = githubTokenInput.value.trim();
 
-    // The >150 Limit Logic
     if (count > 150) {
         tokenSection.classList.remove('hidden'); // Slide down the token UI
         if (!tokenVal) {
@@ -318,7 +317,7 @@ backBtn.addEventListener('click', () => {
     statusMessage.classList.add('hidden');
 });
 
-// --- Phase 1: Fetch Repo ---
+// Phase 1: Fetch Repo
 repoForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     toggleLoadingState('fetch', true);
@@ -404,7 +403,6 @@ generateBtn.addEventListener('click', async () => {
                 try {
                     let res;
                     if (token) {
-                        // raw.githubusercontent.com blocks Authorization via CORS — use the API with raw media type instead
                         const encodedPath = path.split('/').map(encodeURIComponent).join('/');
                         const apiUrl = `https://api.github.com/repos/${repoData.owner}/${repoData.repo}/contents/${encodedPath}?ref=${repoData.branch}`;
                         res = await fetch(apiUrl, {
@@ -422,7 +420,6 @@ generateBtn.addEventListener('click', async () => {
                         if (res.status === 403 || res.status === 429) {
                             throw new Error("GitHub download limit exceeded during generation. Please provide a token to continue.");
                         }
-                        // For generic 404s or weird files, just skip them so the whole app doesn't crash
                         console.warn(`Skipping file (HTTP ${res.status}): ${path}`);
                         return null; 
                     }
@@ -437,7 +434,8 @@ generateBtn.addEventListener('click', async () => {
                         return { type: 'image', path, buffer };
                     } else {
                         const text = await res.text();
-                        return { type: 'text', path, text };
+                        const cleanText = text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
+                        return { type: 'text', path, text: cleanText };
                     }
                 } catch (e) {
                     console.error(`Failed to fetch ${path}`, e);
@@ -480,7 +478,7 @@ generateBtn.addEventListener('click', async () => {
                             paragraphs = getHighlightedWordParagraphs(fileData.text, fileData.path, codeThemeVal);
                         }
 
-                        const noBorder = { style: "none", size: 0, color: "auto" };
+                        const noBorder = { style: docx.BorderStyle.NIL, size: 0, color: "auto" };
                         const allNone = { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder, insideH: noBorder, insideV: noBorder };
                         const tabName = fileData.path.split('/').pop();
 
