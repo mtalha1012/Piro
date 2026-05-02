@@ -112,26 +112,17 @@ githubTokenInput.addEventListener('input', () => {
 // --- Utility Functions ---
 function getHighlightedWordParagraphs(code, filename, theme = 'dark') {
     const ext = filename.split('.').pop().toLowerCase();
-    const langMap = {
-        'cpp': 'cpp', 'c': 'c', 'h': 'cpp', 'hpp': 'cpp', 'cc': 'cpp',
-        'js': 'javascript', 'mjs': 'javascript', 'cjs': 'javascript', 'jsx': 'javascript',
-        'ts': 'typescript', 'tsx': 'typescript',
-        'py': 'python', 'java': 'java',
-        'html': 'xml', 'htm': 'xml', 'xml': 'xml', 'vue': 'xml',
-        'css': 'css', 'scss': 'css', 'less': 'css',
-        'json': 'json', 'jsonc': 'json',
-        'md': 'markdown',
-        'go': 'go', 'rs': 'rust', 'rb': 'ruby',
-        'sh': 'bash', 'bash': 'bash', 'zsh': 'bash',
-        'yaml': 'yaml', 'yml': 'yaml',
-        'php': 'php', 'swift': 'swift', 'kt': 'kotlin', 'cs': 'csharp',
-        'sql': 'sql', 'dart': 'dart', 'r': 'r'
+    const langMap = { 
+        'cpp': 'cpp', 'c': 'c', 'h': 'cpp', 'hpp': 'cpp', 'js': 'javascript', 
+        'ts': 'typescript', 'py': 'python', 'java': 'java', 'html': 'xml', 
+        'css': 'css', 'json': 'json', 'md': 'markdown', 'sql': 'sql', 'sh': 'bash' 
     };
     const lang = langMap[ext] || 'plaintext';
 
     let highlightedHtml = code;
-    try {
-        highlightedHtml = hljs.highlight(code, { language: lang, ignoreIllegals: true }).value;
+    try { 
+        // Changed ignoreIllegals to ignore_illegals
+        highlightedHtml = hljs.highlight(code, { language: lang, ignore_illegals: true }).value; 
     } catch (e) {
         try { highlightedHtml = hljs.highlightAuto(code).value; } catch(ex) {}
     }
@@ -139,40 +130,30 @@ function getHighlightedWordParagraphs(code, filename, theme = 'dark') {
     const tempDiv = document.createElement('pre');
     tempDiv.innerHTML = highlightedHtml;
 
+    // Fully Restored VS Code Dark Theme Colors
     const darkColorMap = {
-        'hljs-keyword': '569CD6',
-        'hljs-built_in': '4EC9B0',
-        'hljs-type': '4EC9B0',
-        'hljs-title': 'DCDCAA',
-        'hljs-title.class': '4EC9B0',
-        'hljs-title.function': 'DCDCAA',
-        'hljs-string': 'CE9178',
-        'hljs-number': 'B5CEA8',
-        'hljs-comment': '6A9955',
-        'hljs-variable': '9CDCFE',
-        'hljs-params': '9CDCFE',
-        'hljs-property': '9CDCFE',
-        'hljs-attr': '9CDCFE',
-        'hljs-meta': 'C586C0',
-        'hljs-literal': '569CD6'
+        'hljs-keyword': '569CD6', 'hljs-built_in': '4EC9B0', 'hljs-type': '4EC9B0',
+        'hljs-title': 'DCDCAA', 'class_': '4EC9B0', 'function_': 'DCDCAA',
+        'hljs-string': 'CE9178', 'hljs-number': 'B5CEA8', 'hljs-comment': '6A9955',
+        'hljs-variable': '9CDCFE', 'hljs-params': '9CDCFE', 'hljs-property': '9CDCFE',
+        'hljs-attr': '9CDCFE', 'hljs-meta': 'C586C0', 'hljs-literal': '569CD6',
+        'hljs-name': '569CD6', 'hljs-tag': '808080', 'hljs-doctag': '569CD6',
+        'hljs-symbol': 'B5CEA8', 'hljs-bullet': 'CE9178', 'hljs-link': 'CE9178',
+        'hljs-addition': 'B5CEA8', 'hljs-deletion': 'CE9178', 'hljs-operator': 'D4D4D4',
+        'hljs-punctuation': 'D4D4D4'
     };
 
+    // Fully Restored VS Code Light Theme Colors
     const lightColorMap = {
-        'hljs-keyword': '0000FF',
-        'hljs-built_in': '267F99',
-        'hljs-type': '267F99',
-        'hljs-title': '795E26',
-        'hljs-title.class': '267F99',
-        'hljs-title.function': '795E26',
-        'hljs-string': 'A31515',
-        'hljs-number': '098658',
-        'hljs-comment': '008000',
-        'hljs-variable': '001080',
-        'hljs-params': '001080',
-        'hljs-property': '001080',
-        'hljs-attr': 'E50000',
-        'hljs-meta': 'AF00DB',
-        'hljs-literal': '0000FF'
+        'hljs-keyword': '0000FF', 'hljs-built_in': '267F99', 'hljs-type': '267F99',
+        'hljs-title': '795E26', 'class_': '267F99', 'function_': '795E26',
+        'hljs-string': 'A31515', 'hljs-number': '098658', 'hljs-comment': '008000',
+        'hljs-variable': '001080', 'hljs-params': '001080', 'hljs-property': '001080',
+        'hljs-attr': 'E50000', 'hljs-meta': 'AF00DB', 'hljs-literal': '0000FF',
+        'hljs-name': '800000', 'hljs-tag': '0000FF', 'hljs-doctag': '0000FF',
+        'hljs-symbol': '008000', 'hljs-bullet': '0000FF', 'hljs-link': '0000FF',
+        'hljs-addition': '008000', 'hljs-deletion': 'A31515', 'hljs-operator': '333333',
+        'hljs-punctuation': '333333'
     };
 
     const colorMap = theme === 'dark' ? darkColorMap : lightColorMap;
@@ -182,41 +163,44 @@ function getHighlightedWordParagraphs(code, filename, theme = 'dark') {
 
     function traverse(node, currentColor) {
         if (node.nodeType === Node.TEXT_NODE) {
-            const text = node.textContent;
-            if (text) {
-                const parts = text.split('\n');
-                parts.forEach((part, idx) => {
+            if (node.textContent) {
+                node.textContent.split('\n').forEach((part, idx) => {
                     if (idx > 0) lines.push([]);
                     if (part) {
-                        // Preserve leading indentation — Word collapses plain spaces
+                        // Preserve leading indentation for Word
                         const preserved = part.replace(/^ +/g, m => ' '.repeat(m.length));
-                        lines[lines.length - 1].push(new docx.TextRun({
-                            text: preserved,
-                            color: currentColor,
-                            font: 'Consolas',
-                            size: 18
+                        lines[lines.length - 1].push(new docx.TextRun({ 
+                            text: preserved, 
+                            color: currentColor, 
+                            font: 'Consolas', 
+                            size: 18 
                         }));
                     }
                 });
             }
         } else if (node.nodeType === Node.ELEMENT_NODE) {
-            let newColor = currentColor;
-            if (node.className && typeof node.className === 'string') {
-                const classes = node.className.split(' ');
-                for (const cls of classes) {
-                    if (colorMap[cls]) { newColor = colorMap[cls]; break; }
-                }
-            }
-            node.childNodes.forEach(child => traverse(child, newColor));
+    let newColor = currentColor;
+    if (node.className && typeof node.className === 'string') {
+        // Add .reverse() to check specific modifiers first
+        const classes = node.className.split(' ').reverse();
+        for (const cls of classes) { 
+            if (colorMap[cls]) { 
+                newColor = colorMap[cls]; 
+                break; 
+            } 
         }
+    }
+    node.childNodes.forEach(child => traverse(child, newColor));
+}
     }
 
     tempDiv.childNodes.forEach(child => traverse(child, defaultColor));
-
+    
     while (lines.length > 0 && lines[lines.length - 1].length === 0) lines.pop();
-    return lines.map(lineRuns => new docx.Paragraph({
-        children: lineRuns.length > 0 ? lineRuns : [new docx.TextRun({ text: ' ', font: 'Consolas', size: 18 })],
-        spacing: { before: 0, after: 0 }
+    
+    return lines.map(lineRuns => new docx.Paragraph({ 
+        children: lineRuns.length > 0 ? lineRuns : [new docx.TextRun({ text: ' ', font: 'Consolas', size: 18 })], 
+        spacing: { before: 0, after: 0 } 
     }));
 }
 
@@ -296,20 +280,32 @@ function updateSelectAllState() {
 
 function generateAsciiTree(paths) {
     const tree = {};
+    
+    // 1. Build a nested object structure from the paths
     paths.forEach(path => {
         const parts = path.split('/');
         let current = tree;
-        parts.forEach(part => { current = current[part] = current[part] || {}; });
+        parts.forEach(part => {
+            current = current[part] = current[part] || {};
+        });
     });
+
     const lines = [];
+
+    // 2. Recursively generate the ASCII string
     function buildLines(node, prefix = "") {
         const entries = Object.keys(node);
         entries.forEach((key, i) => {
             const isLast = i === entries.length - 1;
             lines.push(prefix + (isLast ? "└── " : "├── ") + key);
-            buildLines(node[key], prefix + (isLast ? "    " : "│   "));
+            
+            // If the node has children (it's a folder), recurse deeper
+            if (Object.keys(node[key]).length > 0) {
+                buildLines(node[key], prefix + (isLast ? "    " : "│   "));
+            }
         });
     }
+
     buildLines(tree);
     return lines.join('\n');
 }
@@ -407,10 +403,13 @@ generateBtn.addEventListener('click', async () => {
             ? allFiles.filter(f => selected.some(p => f.startsWith(p)))
             : allFiles.filter(f => !selected.some(p => f.startsWith(p)));
 
+        // ... existing code ...
         if (!includeImagesVal) targetFiles = targetFiles.filter(f => !isImage(f));
         if (targetFiles.length === 0) throw new Error("No files selected to generate.");
 
         const token = githubTokenInput.value.trim();
+        
+        // 👇 ADD THIS: Generate the ASCII tree from the target files
         const treeText = generateAsciiTree(targetFiles);
 
         let mdContent = `# Project Codebase: ${repoData.repo}\n**Repository:** https://github.com/${repoData.owner}/${repoData.repo}\n\n`;
@@ -419,11 +418,12 @@ generateBtn.addEventListener('click', async () => {
             bodyChildren.push(new docx.Paragraph({ text: `Project Codebase: ${repoData.repo}`, heading: docx.HeadingLevel.TITLE, alignment: docx.AlignmentType.CENTER, spacing: { before: 2000, after: 400 }}));
             bodyChildren.push(new docx.Paragraph({ text: `Repository: https://github.com/${repoData.owner}/${repoData.repo}`, alignment: docx.AlignmentType.CENTER }));
             
-            // Inject ASCII Tree into Docx
+            // 👇 ADD THIS: Inject the ASCII Tree into the Docx
             bodyChildren.push(new docx.Paragraph({
                 children: [
                     new docx.TextRun({ text: "Project Structure", bold: true, size: 28 }),
                     ...treeText.split('\n').map(line => 
+                        // Break each line and use Consolas so the ASCII characters align perfectly
                         new docx.TextRun({ 
                             text: line, 
                             break: 1, 
@@ -436,6 +436,7 @@ generateBtn.addEventListener('click', async () => {
 
             bodyChildren.push(new docx.Paragraph({ text: "", pageBreakBefore: true }));
         } else {
+            // 👇 ADD THIS: Inject the ASCII tree into the Markdown export
             mdContent += `## Repository Structure\n\`\`\`text\n${treeText}\n\`\`\`\n\n`;
         }
 
@@ -518,7 +519,7 @@ generateBtn.addEventListener('click', async () => {
                     } else {
                         let paragraphs;
 
-                        if (fileData.text.length > 30000) {
+                        if (fileData.text.length > 300000) {
                             paragraphs = [new docx.Paragraph({
                                 children: [new docx.TextRun({ text: '/* File too large for syntax highlighting — raw text */', color: codeThemeVal === 'dark' ? '6A9955' : '008000', font: 'Consolas', size: 18 })],
                                 spacing: { before: 0, after: 0 }
