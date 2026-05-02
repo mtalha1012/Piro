@@ -24,18 +24,18 @@
                     <img src="logo.png" alt="Piro Logo" class="nav-logo">
                     <h1 class="logo">Piro</h1>
                 </div>
-                <p class="subtitle">Stitching Code into Context.</p>
+               <p class="subtitle">Instantly compile GitHub repositories into formatted Project Reports and AI context.</p>
             </header>
 
            <!-- Dual Feature Cards (Equalized) -->
             <section class="hero-features">
                 <div class="feature-card">
-                    <div class="feature-icon doc-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
                     </div>
                     <div class="feature-text">
-                        <h3>Human Review (.docx)</h3>
-                        <p>Generate clean, syntax-highlighted Word reports for documentation, sharing, and offline reading.</p>
+                        <h3>Project Reports</h3>
+                        <p>Generate beautifully formatted .docx files with exact VS Code syntax highlighting for your final code submissions.</p>
                     </div>
                 </div>
                 
@@ -57,25 +57,10 @@
                     <span class="tab-hint">💡 Press <b>Tab</b> to auto-fill 'https://github.com/'</span>
                 </div>
                 
-                <input type="password" id="githubToken" placeholder="GitHub Personal Access Token (Optional)" autocomplete="off">
-                
                 <button type="submit" id="fetchBtn">
                     <span id="fetchBtnText">Fetch Repository</span>
                     <span id="fetchLoader" class="hidden">Mapping Structure...</span>
                 </button>
-                
-                <!-- Noticeable Token Limit Box -->
-                <div id="tokenHintBox" class="token-hint-box">
-                    <div class="hint-content">
-                        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-                        <span id="hintBoxText">Provide a <a href="https://github.com/settings/tokens" target="_blank">GitHub Token</a> to export >60 files.</span>
-                    </div>
-                    
-                    <details class="token-details">
-                        <summary>Why do I need to provide a GitHub token?</summary>
-                        <p>GitHub limits unauthenticated API requests to 60 per hour. Providing a personal token securely bypasses this limit directly from your browser, ensuring you don't get temporarily blocked while exporting large repositories.</p>
-                    </details>
-                </div>
             </form>
         </div>
 
@@ -90,27 +75,11 @@
                 </div>
             </div>
 
-            <!-- Updated Settings Bar -->
             <div class="toggle-container">
-                <div class="setting-group">
-                    <span>Mode:</span>
-                    <select id="selectionMode">
-                        <option value="include">Include</option>
-                        <option value="exclude">Exclude</option>
-                    </select>
-                </div>
-                <div class="setting-group">
-                    <span>Export:</span>
-                    <select id="exportFormat">
-                        <option value="docx">Word (.docx)</option>
-                        <option value="md">Markdown (.md)</option>
-                    </select>
-                </div>
-                <div class="image-toggle">
-                    <label>
-                        <input type="checkbox" id="includeImages" checked>
-                        <span>Images</span>
-                    </label>
+                <span class="mode-label">Selection Mode</span>
+                <div class="pill-group" id="selectionModeGroup">
+                    <button type="button" class="pill active" data-value="include">Include Selected</button>
+                    <button type="button" class="pill" data-value="exclude">Exclude Selected</button>
                 </div>
             </div>
 
@@ -123,6 +92,58 @@
             </div>
             
             <div class="tree-container" id="treeContainer"></div>
+
+            <div class="export-options">
+                <div class="option-row">
+                    <span class="option-label">Format</span>
+                    <div class="pill-group" id="exportFormatGroup">
+                        <button type="button" class="pill active" data-value="docx">Word (.docx)</button>
+                        <button type="button" class="pill" data-value="md">Markdown (.md)</button>
+                    </div>
+                </div>
+                <div class="option-row">
+                    <span class="option-label">Images</span>
+                    <div class="pill-group" id="imagesGroup">
+                        <button type="button" class="pill active" data-value="yes">Include</button>
+                        <button type="button" class="pill" data-value="no">Exclude</button>
+                    </div>
+                </div>
+                <div class="option-row" id="themeRow">
+                    <span class="option-label">Background</span>
+                    <div class="pill-group" id="themeGroup">
+                        <button type="button" class="pill active" data-value="dark">Dark</button>
+                        <button type="button" class="pill" data-value="light">Light</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dynamic Token Section (Hidden by default) -->
+            <div id="tokenSection" class="token-section hidden">
+                <div class="token-hint-box">
+                    <div class="hint-content">
+                        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                        <span id="hintBoxText"><b>Limit Exceeded:</b> Please provide a <a href="https://github.com/settings/tokens" target="_blank">GitHub Token</a> to export >150 files.</span>
+                    </div>
+                    <details class="token-details">
+                        <summary>Why do I need to provide a GitHub token?</summary>
+                        <p>GitHub limits unauthenticated API requests to 60 per hour. Providing a personal token securely bypasses this limit directly from your browser.</p>
+                    </details>
+                    <details class="token-details">
+                        <summary>How to generate a GitHub token</summary>
+                        <div class="token-steps">
+                            <ol>
+                                <li>Go to <a href="https://github.com/settings/tokens" target="_blank">https://github.com/settings/tokens</a></li>
+                                <li>Click <b>Generate new token</b> (Select Fine-grained).</li>
+                                <li>Name your token and (optionally) set a 1-day expiration.</li>
+                                <li>Ensure it has <b>Read-only</b> access to public repositories.</li>
+                                <li>Click <b>Generate token</b>.</li>
+                                <li>Copy the token <i>(Important: you can only copy it once!)</i></li>
+                            </ol>
+                        </div>
+                    </details>
+                </div>
+                <input type="password" id="githubToken" placeholder="Paste GitHub Token here..." autocomplete="off">
+            </div>
 
             <div id="progressContainer" class="progress-wrapper hidden">
                 <div class="progress-info">
