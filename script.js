@@ -32,7 +32,7 @@ let includeImagesVal = localStorage.getItem('piro_includeImages') !== 'no'; // D
 let codeThemeVal = localStorage.getItem('piro_theme') || 'dark';
 
 const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.bmp'];
-const BINARY_EXTENSIONS = ['.mp4', '.mp3', '.wav', '.zip', '.pdf', '.exe', '.pyc', '.ttf', '.woff', '.woff2', '.svg', '.ico', '.eot', '.dll', '.bin'];
+const BINARY_EXTENSIONS = ['.mp4', '.mp3', '.wav', '.zip', '.pdf', '.exe', '.pyc', '.ttf', '.woff', '.woff2', '.svg', '.ico', '.eot', '.dll', '.bin', '.apk'];
 
 const isImage = (path) => IMAGE_EXTENSIONS.some(ext => path.toLowerCase().endsWith(ext));
 const isBinary = (path) => BINARY_EXTENSIONS.some(ext => path.toLowerCase().endsWith(ext));
