@@ -110,6 +110,9 @@ repoUrlInput.addEventListener('keydown', function(e) {
     }
 });
 
+// --- DOM Elements Continued ---
+const tokenSection = document.getElementById('tokenSection');
+
 // --- Toggle Token Section (Home Screen) ---
 const toggleTokenBtn = document.getElementById('toggleTokenBtn');
 const homeTokenDetails = document.getElementById('homeTokenDetails');
@@ -120,15 +123,27 @@ if (toggleTokenBtn && homeTokenDetails) {
 }
 
 const githubTokenHome = document.getElementById('githubTokenHome');
+const githubTokenSelection = document.getElementById('githubTokenSelection');
+
+function syncTokens(source) {
+    const val = source.value.trim();
+    if (githubTokenHome) githubTokenHome.value = val;
+    if (githubTokenSelection) githubTokenSelection.value = val;
+    validateGenerateBtn();
+}
+
 if (githubTokenHome) {
-    githubTokenHome.addEventListener('input', () => {
-        validateGenerateBtn();
-    });
+    githubTokenHome.addEventListener('input', () => syncTokens(githubTokenHome));
+}
+if (githubTokenSelection) {
+    githubTokenSelection.addEventListener('input', () => syncTokens(githubTokenSelection));
 }
 
 // --- Utility Functions ---
 function getGlobalToken() {
-    return document.getElementById('githubTokenHome')?.value.trim() || '';
+    const homeVal = document.getElementById('githubTokenHome')?.value.trim();
+    const selectionVal = document.getElementById('githubTokenSelection')?.value.trim();
+    return homeVal || selectionVal || '';
 }
 
 function getFileExtension(filename) {
@@ -163,6 +178,9 @@ function parseGitHubUrl(url) {
 }
 
 function updateFileTree() {
+    // Save current selection state before filtering
+    const selectedPaths = new Set(Array.from(treeContainer.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value));
+
     const checkedExts = Array.from(document.querySelectorAll('#extensionList input:checked')).map(cb => cb.value);
     
     allFiles = rawFiles.filter(path => {
@@ -182,7 +200,7 @@ function updateFileTree() {
         }
     });
 
-    buildTreeUI(allFiles);
+    buildTreeUI(allFiles, selectedPaths);
     validateGenerateBtn();
 }
 
@@ -663,7 +681,7 @@ generateBtn.addEventListener('click', async () => {
 });
 
 // --- Tree UI Engine ---
-function buildTreeUI(paths) {
+function buildTreeUI(paths, selectedPaths = new Set()) {
     treeContainer.innerHTML = '';
     const fileTree = {};
     paths.forEach(path => {
@@ -674,10 +692,10 @@ function buildTreeUI(paths) {
             else { current[part] = current[part] || {}; current = current[part]; }
         });
     });
-    renderTree(fileTree, treeContainer, '');
+    renderTree(fileTree, treeContainer, '', selectedPaths);
 }
 
-function renderTree(node, parentElement, currentPath) {
+function renderTree(node, parentElement, currentPath, selectedPaths) {
     Object.keys(node).sort().forEach(key => {
         const isFile = node[key] === null;
         const fullPath = currentPath ? `${currentPath}/${key}` : key;
@@ -686,6 +704,12 @@ function renderTree(node, parentElement, currentPath) {
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
         checkbox.value = isFile ? fullPath : `${fullPath}/`;
+        
+        // Restore selection state
+        if (selectedPaths.has(checkbox.value)) {
+            checkbox.checked = true;
+        }
+
         checkbox.addEventListener('change', validateGenerateBtn);
         checkbox.addEventListener('click', (e) => handleShiftClick(e, checkbox));
 
@@ -694,6 +718,10 @@ function renderTree(node, parentElement, currentPath) {
             const label = document.createElement('span'); label.className = 'folder'; label.textContent = key;
             itemDiv.append(chevron, checkbox, label);
             const childrenContainer = document.createElement('div'); childrenContainer.className = 'children-container hidden';
+            
+            // If any child is selected, expand this folder maybe?
+            // Actually, let's just restore the check state.
+            
             itemDiv.addEventListener('click', (e) => {
                 if (e.target !== checkbox) {
                     childrenContainer.classList.toggle('hidden');
@@ -706,7 +734,7 @@ function renderTree(node, parentElement, currentPath) {
                 validateGenerateBtn();
             });
             parentElement.append(itemDiv, childrenContainer);
-            renderTree(node[key], childrenContainer, fullPath);
+            renderTree(node[key], childrenContainer, fullPath, selectedPaths);
         } else {
             const spacer = document.createElement('span'); spacer.className = 'spacer'; 
             spacer.style.display = 'inline-block'; spacer.style.width = '16px'; 
