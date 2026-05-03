@@ -2,8 +2,6 @@
 const homeScreen = document.getElementById('homeScreen');
 const repoForm = document.getElementById('repoForm');
 const repoUrlInput = document.getElementById('repoUrl');
-const githubTokenInput = document.getElementById('githubToken');
-const tokenHintBox = document.getElementById('tokenHintBox');
 const hintBoxText = document.getElementById('hintBoxText');
 const statusMessage = document.getElementById('statusMessage');
 
@@ -22,8 +20,10 @@ const progressBarFill = document.getElementById('progressBarFill');
 
 // --- State & Constants ---
 let repoData = { owner: '', repo: '', branch: '' };
-let allFiles = [];
+let rawFiles = []; // Holds all fetched files
+let allFiles = []; // Holds currently filtered files
 let lastCheckedNode = null;
+let filterStrategyVal = localStorage.getItem('piro_filterStrategy') || 'auto';
 
 // Load saved preferences from the browser (or fallback to defaults)
 let selectionModeVal = localStorage.getItem('piro_selectionMode') || 'include';
@@ -84,6 +84,13 @@ setupPillGroup('themeGroup', 'piro_theme', codeThemeVal, val => {
     codeThemeVal = val; 
 });
 
+setupPillGroup('filterStrategyGroup', 'piro_filterStrategy', filterStrategyVal, val => {
+    filterStrategyVal = val;
+    document.getElementById('customExtensionContainer').classList.toggle('hidden', val === 'auto');
+    updateFileTree();
+});
+document.getElementById('customExtensionContainer').classList.toggle('hidden', filterStrategyVal === 'auto');
+
 // Initial UI toggle: Hide the theme row on startup if Markdown was the saved preference
 themeRow.style.display = exportFormatVal === 'docx' ? 'flex' : 'none';
 
@@ -105,11 +112,47 @@ repoUrlInput.addEventListener('keydown', function(e) {
 
 const tokenSection = document.getElementById('tokenSection');
 
-githubTokenInput.addEventListener('input', () => {
+document.getElementById('githubTokenHome').addEventListener('input', () => {
     validateGenerateBtn();
 });
 
 // --- Utility Functions ---
+function getGlobalToken() {
+    return document.getElementById('githubTokenHome')?.value.trim() || '';
+}
+
+function getFileExtension(filename) {
+    const parts = filename.split('/');
+    const name = parts[parts.length - 1];
+    if (!name.includes('.')) return '[No Extension]';
+    if (name.startsWith('.') && name.lastIndexOf('.') === 0) return name; 
+    return name.substring(name.lastIndexOf('.')).toLowerCase();
+}
+
+function updateFileTree() {
+    const checkedExts = Array.from(document.querySelectorAll('#extensionList input:checked')).map(cb => cb.value);
+    
+    allFiles = rawFiles.filter(path => {
+        const parts = path.split('/');
+        // Always block dangerous cache folders to prevent crashing
+        const isJunkFolder = parts.some(part => (part.startsWith('.') && part !== '.github') || part === 'node_modules' || part === 'build' || part === 'target');
+        if (isJunkFolder) return false;
+
+        const ext = getFileExtension(path);
+        const fileName = parts[parts.length - 1];
+
+        if (filterStrategyVal === 'auto') {
+            if (IGNORED_FILES.includes(fileName) || IGNORED_EXTENSIONS.includes(ext)) return false;
+            return true;
+        } else {
+            return checkedExts.includes(ext);
+        }
+    });
+
+    buildTreeUI(allFiles);
+    validateGenerateBtn();
+}
+
 function getHighlightedWordParagraphs(code, filename, theme = 'dark') {
     const ext = filename.split('.').pop().toLowerCase();
     const langMap = { 
@@ -240,7 +283,7 @@ function validateGenerateBtn() {
     if (!includeImagesVal) targetFiles = targetFiles.filter(f => !isImage(f));
 
     const count = targetFiles.length;
-    const tokenVal = githubTokenInput.value.trim();
+    const tokenVal = getGlobalToken();
 
     // The >150 Limit Logic
     if (count > 150) {
@@ -328,56 +371,60 @@ repoForm.addEventListener('submit', async (e) => {
         repoData.owner = owner;
         repoData.repo = repo;
 
-        const headers = {};
+        const token = getGlobalToken();
+        const headers = token ? { 'Authorization': `token ${token}` } : {};
 
         const repoRes = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers });
         if (!repoRes.ok) {
-            if (repoRes.status === 403) throw new Error("GitHub API rate limit hit. Please provide a Personal Access Token.");
-            throw new Error("Repository not found or is private.");
+            if (repoRes.status === 401) {
+                document.getElementById('homeTokenDetails').open = true;
+                throw new Error("Invalid token. Check that your GitHub Personal Access Token is correct and hasn't expired.");
+            }
+            if (repoRes.status === 404) {
+                document.getElementById('homeTokenDetails').open = true;
+                if (token) {
+                    throw new Error("Repository not found. Your token may lack the 'repo' scope, or you may not have access to this repository.");
+                } else {
+                    throw new Error("Repository not found. If it's private, add your GitHub Token above.");
+                }
+            }
+            if (repoRes.status === 403) throw new Error("GitHub API rate limit hit. Add a GitHub Token to continue.");
+            throw new Error(`GitHub returned an error (${repoRes.status}). Please try again.`);
         }
         
-        const repoJson = await repoRes.json();
-        repoData.branch = repoJson.default_branch;
+        repoData.branch = (await repoRes.json()).default_branch;
 
         const treeRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/${repoData.branch}?recursive=1`, { headers });
-        if (!treeRes.ok) throw new Error("Failed to load repository tree. Check your token permissions.");
-        const treeJson = await treeRes.json();
-
-        allFiles = treeJson.tree
-            .filter(item => {
-                // 1. Must be a file
-                if (item.type !== 'blob') return false;
-                
-                // 2. Must not be a binary extension
-                if (isBinary(item.path)) return false;
-
-                // 3. Must not be a junk folder (.git, node_modules, etc)
-                const parts = item.path.split('/');
-                const isJunkFolder = parts.some(part => 
-                    (part.startsWith('.') && part !== '.github') || 
-                    part === 'node_modules' || 
-                    part === 'build' ||
-                    part === 'target'
-                );
-                if (isJunkFolder) return false;
-
-                // 4. Must not be useless metadata/config files
-                const fileName = parts[parts.length - 1];
-                if (IGNORED_FILES.includes(fileName)) return false;
-                
-                const ext = fileName.substring(fileName.lastIndexOf('.')).toLowerCase();
-                if (IGNORED_EXTENSIONS.includes(ext)) return false;
-
-                return true;
-            })
+        if (!treeRes.ok) throw new Error("Failed to load repository tree.");
+        
+        // Save to rawFiles instead of allFiles
+        rawFiles = (await treeRes.json()).tree
+            .filter(item => item.type === 'blob' && !isBinary(item.path))
             .map(item => item.path);
+
+        // Build Extension Filter UI dynamically
+        const extSet = new Set();
+        rawFiles.forEach(path => extSet.add(getFileExtension(path)));
+        
+        const extListUI = document.getElementById('extensionList');
+        extListUI.innerHTML = '';
+        Array.from(extSet).sort().forEach(ext => {
+            const label = document.createElement('label');
+            label.className = 'ext-label';
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.value = ext;
+            checkbox.checked = !IGNORED_EXTENSIONS.includes(ext) && !IGNORED_FILES.includes(ext);
+            checkbox.addEventListener('change', updateFileTree);
+            label.append(checkbox, document.createTextNode(ext));
+            extListUI.appendChild(label);
+        });
         
         displayRepoName.textContent = `${owner} / ${repo}`;
         homeScreen.classList.add('hidden');
         selectionUI.classList.remove('hidden');
         
-        buildTreeUI(allFiles);
-        validateGenerateBtn();
+        updateFileTree(); // This applies filters and builds the UI
         
     } catch (error) {
         showError(error.message);
@@ -407,9 +454,8 @@ generateBtn.addEventListener('click', async () => {
         if (!includeImagesVal) targetFiles = targetFiles.filter(f => !isImage(f));
         if (targetFiles.length === 0) throw new Error("No files selected to generate.");
 
-        const token = githubTokenInput.value.trim();
+        const token = getGlobalToken();
         
-        // 👇 ADD THIS: Generate the ASCII tree from the target files
         const treeText = generateAsciiTree(targetFiles);
 
         let mdContent = `# Project Codebase: ${repoData.repo}\n**Repository:** https://github.com/${repoData.owner}/${repoData.repo}\n\n`;
