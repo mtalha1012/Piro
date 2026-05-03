@@ -55,22 +55,33 @@
                     <span class="tab-hint">💡 Press <b>Tab</b> to auto-fill 'https://github.com/'</span>
                 </div>
                 
-                <details class="private-token-details" id="homeTokenDetails">
-                    <summary class="private-token-summary">🔒 Private Repository? Add a Token</summary>
-                    <div class="private-token-body">
-                        <p class="private-token-desc">To access private repos, provide a <a href="https://github.com/settings/tokens" target="_blank">GitHub Token</a>.</p>
-                        <details class="token-how-to">
-                            <summary>How to generate a token?</summary>
-                            <ol>
-                                <li>Go to <a href="https://github.com/settings/tokens" target="_blank">GitHub Settings → Tokens</a></li>
-                                <li>Click <b>Generate new token (classic)</b>.</li>
-                                <li>Give it a name and check the <b>repo</b> scope.</li>
-                                <li>Generate and paste the token below.</li>
-                            </ol>
-                        </details>
+                <div class="private-token-container" id="homeTokenSection">
+                    <button type="button" class="private-toggle-btn" id="toggleTokenBtn">
+                        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                        <span>Private Repository? Add a Token</span>
+                    </button>
+                    
+                    <div id="homeTokenDetails" class="token-hint-box hidden">
+                        <div class="hint-content">
+                            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                            <div class="hint-text-wrapper">
+                                <p>To access private repos, provide a <a href="https://github.com/settings/tokens" target="_blank">GitHub Token</a>.</p>
+                                <details class="token-details">
+                                    <summary>How to generate a token?</summary>
+                                    <div class="token-steps">
+                                        <ol>
+                                            <li>Go to <a href="https://github.com/settings/tokens" target="_blank">GitHub Settings → Tokens</a></li>
+                                            <li>Click <b>Generate new token (classic)</b>.</li>
+                                            <li>Give it a name and check the <b>repo</b> scope.</li>
+                                            <li>Generate and paste the token below.</li>
+                                        </ol>
+                                    </div>
+                                </details>
+                            </div>
+                        </div>
                         <input type="password" id="githubTokenHome" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="off">
                     </div>
-                </details>
+                </div>
 
                 <button type="submit" id="fetchBtn">
                     <span id="fetchBtnText">Fetch Repository</span>
