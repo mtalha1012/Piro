@@ -110,11 +110,21 @@ repoUrlInput.addEventListener('keydown', function(e) {
     }
 });
 
-const tokenSection = document.getElementById('tokenSection');
+// --- Toggle Token Section (Home Screen) ---
+const toggleTokenBtn = document.getElementById('toggleTokenBtn');
+const homeTokenDetails = document.getElementById('homeTokenDetails');
+if (toggleTokenBtn && homeTokenDetails) {
+    toggleTokenBtn.addEventListener('click', () => {
+        homeTokenDetails.classList.toggle('hidden');
+    });
+}
 
-document.getElementById('githubTokenHome').addEventListener('input', () => {
-    validateGenerateBtn();
-});
+const githubTokenHome = document.getElementById('githubTokenHome');
+if (githubTokenHome) {
+    githubTokenHome.addEventListener('input', () => {
+        validateGenerateBtn();
+    });
+}
 
 // --- Utility Functions ---
 function getGlobalToken() {
@@ -127,6 +137,29 @@ function getFileExtension(filename) {
     if (!name.includes('.')) return '[No Extension]';
     if (name.startsWith('.') && name.lastIndexOf('.') === 0) return name; 
     return name.substring(name.lastIndexOf('.')).toLowerCase();
+}
+
+function parseGitHubUrl(url) {
+    let target = url.trim();
+    
+    // Support shorthand like mtalha1012/Piro
+    if (!target.startsWith('http') && target.split('/').length === 2) {
+        target = `https://github.com/${target}`;
+    }
+
+    try {
+        if (!target.startsWith('http')) target = `https://${target}`;
+        const urlObj = new URL(target);
+        const path = urlObj.pathname.replace(/^\/|\/$/g, '');
+        const parts = path.split('/');
+        
+        if (parts.length >= 2) {
+            return { owner: parts[0], repo: parts[1] };
+        }
+        throw new Error("Invalid format");
+    } catch (e) {
+        throw new Error("Please enter a valid GitHub repository URL (e.g., https://github.com/owner/repo or owner/repo).");
+    }
 }
 
 function updateFileTree() {
@@ -164,8 +197,7 @@ function getHighlightedWordParagraphs(code, filename, theme = 'dark') {
 
     let highlightedHtml = code;
     try { 
-        // Changed ignoreIllegals to ignore_illegals
-        highlightedHtml = hljs.highlight(code, { language: lang, ignore_illegals: true }).value; 
+        highlightedHtml = hljs.highlight(code, { language: lang, ignoreIllegals: true }).value; 
     } catch (e) {
         try { highlightedHtml = hljs.highlightAuto(code).value; } catch(ex) {}
     }
@@ -247,16 +279,6 @@ function getHighlightedWordParagraphs(code, filename, theme = 'dark') {
     }));
 }
 
-function parseGitHubUrl(url) {
-    try {
-        const urlObj = new URL(url);
-        const parts = urlObj.pathname.replace(/^\/|\/$/g, '').split('/');
-        if (parts.length >= 2) return { owner: parts[0], repo: parts[1] };
-        throw new Error("Invalid format");
-    } catch (e) {
-        throw new Error("Please enter a valid GitHub repository URL.");
-    }
-}
 
 function toggleLoadingState(prefix, isLoading) {
     const btnId = prefix === 'gen' ? 'generateBtn' : 'fetchBtn';
@@ -377,18 +399,24 @@ repoForm.addEventListener('submit', async (e) => {
         const repoRes = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers });
         if (!repoRes.ok) {
             if (repoRes.status === 401) {
-                document.getElementById('homeTokenDetails').open = true;
-                throw new Error("Invalid token. Check that your GitHub Personal Access Token is correct and hasn't expired.");
+                if (homeTokenDetails) homeTokenDetails.classList.remove('hidden');
+                throw new Error("Invalid or expired token. Please check your GitHub Personal Access Token.");
             }
             if (repoRes.status === 404) {
-                document.getElementById('homeTokenDetails').open = true;
+                if (homeTokenDetails) homeTokenDetails.classList.remove('hidden');
                 if (token) {
-                    throw new Error("Repository not found. Your token may lack the 'repo' scope, or you may not have access to this repository.");
+                    throw new Error("Repository not found. Your token may lack the 'repo' scope or access to this private repository.");
                 } else {
-                    throw new Error("Repository not found. If it's private, add your GitHub Token above.");
+                    throw new Error("Repository not found. If this is a private repository, please add a GitHub Token.");
                 }
             }
-            if (repoRes.status === 403) throw new Error("GitHub API rate limit hit. Add a GitHub Token to continue.");
+            if (repoRes.status === 403) {
+                if (token) {
+                    throw new Error("Access denied. Your token may have reached its rate limit or lacks required permissions.");
+                } else {
+                    throw new Error("GitHub API rate limit exceeded. Please provide a GitHub Token to continue.");
+                }
+            }
             throw new Error(`GitHub returned an error (${repoRes.status}). Please try again.`);
         }
         
@@ -510,11 +538,12 @@ generateBtn.addEventListener('click', async () => {
                     }
                     
                     if (!res.ok) {
-                        // 403 (Rate Limit) or 429 (Too Many Requests)
-                        if (res.status === 403 || res.status === 429) {
-                            throw new Error("GitHub download limit exceeded during generation. Please provide a token to continue.");
+                        if (res.status === 401) {
+                            throw new Error("Token became invalid or expired during download. Please refresh and try again.");
                         }
-                        // For generic 404s or weird files, just skip them so the whole app doesn't crash
+                        if (res.status === 403 || res.status === 429) {
+                            throw new Error("GitHub download limit exceeded. Please ensure your token has sufficient rate limits.");
+                        }
                         console.warn(`Skipping file (HTTP ${res.status}): ${path}`);
                         return null; 
                     }
