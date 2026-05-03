@@ -161,8 +161,22 @@
                 <div class="token-hint-box">
                     <div class="hint-content">
                         <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-                        <span id="hintBoxText"><b>Limit Exceeded:</b> Go back and enter a GitHub Token to export more than 150 files.</span>
+                        <div class="hint-text-wrapper">
+                            <span id="hintBoxText"><b>Limit Exceeded:</b> Please enter a GitHub Token to export more than 150 files.</span>
+                            <details class="token-details">
+                                <summary>How to generate a token?</summary>
+                                <div class="token-steps">
+                                    <ol>
+                                        <li>Go to <a href="https://github.com/settings/tokens" target="_blank">GitHub Settings → Tokens</a></li>
+                                        <li>Click <b>Generate new token (classic)</b>.</li>
+                                        <li>Give it a name and check the <b>repo</b> scope.</li>
+                                        <li>Generate and paste the token below.</li>
+                                    </ol>
+                                </div>
+                            </details>
+                        </div>
                     </div>
+                    <input type="password" id="githubTokenSelection" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="off">
                 </div>
             </div>
 
