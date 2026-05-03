@@ -702,81 +702,43 @@ input[type="password"]:focus {
     to { opacity: 1; transform: translateY(0); }
 }
 
-/* -- Private Token Details (home screen) -- */
-.private-token-details {
+/* -- Private Token Section (Home Screen) -- */
+.private-token-container {
+    width: 100%;
+}
+
+.private-toggle-btn {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background-color: #1e293b;
     border: 1px solid #334155;
     border-radius: 8px;
-    background-color: #1e293b;
-    overflow: hidden;
-}
-
-.private-token-summary {
-    display: block;
-    padding: 0.75rem 1rem;
-    cursor: pointer;
-    font-weight: 600;
-    font-size: 0.875rem;
     color: #e2e8f0;
-    user-select: none;
-    list-style: none;
-    transition: background-color 0.15s ease;
-}
-
-.private-token-summary::-webkit-details-marker { display: none; }
-
-.private-token-summary:hover { background-color: #273449; }
-
-.private-token-details[open] .private-token-summary {
-    border-bottom: 1px solid #334155;
-}
-
-.private-token-body {
-    padding: 1rem;
-    background-color: #0f172a;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
     display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    transition: all 0.2s ease;
 }
 
-.private-token-desc {
-    font-size: 0.825rem;
+.private-toggle-btn:hover {
+    background-color: #273449;
+    border-color: #475569;
+}
+
+.private-toggle-btn svg {
     color: #94a3b8;
 }
 
-.private-token-desc a {
-    color: #10b981;
-    text-decoration: none;
-    font-weight: 600;
-}
-
-.private-token-desc a:hover { color: #34d399; }
-
-.token-how-to > summary {
-    color: #64748b;
-    font-size: 0.8rem;
-    cursor: pointer;
-    outline: none;
-    user-select: none;
-    list-style: none;
-    transition: color 0.15s ease;
-}
-
-.token-how-to > summary::-webkit-details-marker { display: none; }
-.token-how-to > summary:hover { color: #94a3b8; }
-
-.token-how-to ol {
-    margin-top: 0.5rem;
-    padding-left: 1.25rem;
-    color: #64748b;
-    font-size: 0.8rem;
+.hint-text-wrapper {
     display: flex;
     flex-direction: column;
-    gap: 0.2rem;
-    line-height: 1.5;
+    gap: 4px;
+    flex: 1;
 }
-
-.token-how-to ol a { color: #10b981; text-decoration: none; }
-.token-how-to ol a:hover { color: #34d399; }
 
 /* -- Custom Extension Filter (selection screen) -- */
 .custom-ext-container {
