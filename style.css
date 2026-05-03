@@ -701,3 +701,122 @@ input[type="password"]:focus {
     from { opacity: 0; transform: translateY(-10px); }
     to { opacity: 1; transform: translateY(0); }
 }
+
+/* -- Private Token Details (home screen) -- */
+.private-token-details {
+    border: 1px solid #334155;
+    border-radius: 8px;
+    background-color: #1e293b;
+    overflow: hidden;
+}
+
+.private-token-summary {
+    display: block;
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: #e2e8f0;
+    user-select: none;
+    list-style: none;
+    transition: background-color 0.15s ease;
+}
+
+.private-token-summary::-webkit-details-marker { display: none; }
+
+.private-token-summary:hover { background-color: #273449; }
+
+.private-token-details[open] .private-token-summary {
+    border-bottom: 1px solid #334155;
+}
+
+.private-token-body {
+    padding: 1rem;
+    background-color: #0f172a;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.private-token-desc {
+    font-size: 0.825rem;
+    color: #94a3b8;
+}
+
+.private-token-desc a {
+    color: #10b981;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.private-token-desc a:hover { color: #34d399; }
+
+.token-how-to > summary {
+    color: #64748b;
+    font-size: 0.8rem;
+    cursor: pointer;
+    outline: none;
+    user-select: none;
+    list-style: none;
+    transition: color 0.15s ease;
+}
+
+.token-how-to > summary::-webkit-details-marker { display: none; }
+.token-how-to > summary:hover { color: #94a3b8; }
+
+.token-how-to ol {
+    margin-top: 0.5rem;
+    padding-left: 1.25rem;
+    color: #64748b;
+    font-size: 0.8rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    line-height: 1.5;
+}
+
+.token-how-to ol a { color: #10b981; text-decoration: none; }
+.token-how-to ol a:hover { color: #34d399; }
+
+/* -- Custom Extension Filter (selection screen) -- */
+.custom-ext-container {
+    margin: 0 1.5rem;
+    padding: 1rem;
+    background-color: #0f172a;
+    border: 1px solid #334155;
+    border-top: none;
+}
+
+.custom-ext-title {
+    display: block;
+    margin-bottom: 0.75rem;
+    font-weight: 600;
+    font-size: 0.82rem;
+    color: #e2e8f0;
+}
+
+.extension-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.ext-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background-color: #1e293b;
+    padding: 4px 10px;
+    border-radius: 4px;
+    border: 1px solid #334155;
+    cursor: pointer;
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 0.78rem;
+    color: #94a3b8;
+    transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.ext-label:hover {
+    border-color: #10b981;
+    color: #e2e8f0;
+}
