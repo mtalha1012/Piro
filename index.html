@@ -27,7 +27,6 @@
                <p class="subtitle">Instantly compile GitHub repositories into formatted Project Reports and AI context.</p>
             </header>
 
-           <!-- Dual Feature Cards (Equalized) -->
             <section class="hero-features">
                 <div class="feature-card">
                     <div class="feature-icon">
@@ -51,12 +50,28 @@
             </section>
 
             <form id="repoForm" class="input-group">
-                <!-- URL Input with Right Arrow Hint -->
                 <div class="url-container">
                     <input type="url" id="repoUrl" placeholder="https://github.com/owner/repository" required autofocus>
                     <span class="tab-hint">💡 Press <b>Tab</b> to auto-fill 'https://github.com/'</span>
                 </div>
                 
+                <details class="private-token-details" id="homeTokenDetails">
+                    <summary class="private-token-summary">🔒 Private Repository? Add a Token</summary>
+                    <div class="private-token-body">
+                        <p class="private-token-desc">To access private repos, provide a <a href="https://github.com/settings/tokens" target="_blank">GitHub Token</a>.</p>
+                        <details class="token-how-to">
+                            <summary>How to generate a token?</summary>
+                            <ol>
+                                <li>Go to <a href="https://github.com/settings/tokens" target="_blank">GitHub Settings → Tokens</a></li>
+                                <li>Click <b>Generate new token (classic)</b>.</li>
+                                <li>Give it a name and check the <b>repo</b> scope.</li>
+                                <li>Generate and paste the token below.</li>
+                            </ol>
+                        </details>
+                        <input type="password" id="githubTokenHome" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="off">
+                    </div>
+                </details>
+
                 <button type="submit" id="fetchBtn">
                     <span id="fetchBtnText">Fetch Repository</span>
                     <span id="fetchLoader" class="hidden">Mapping Structure...</span>
@@ -115,34 +130,29 @@
                         <button type="button" class="pill" data-value="light">Light</button>
                     </div>
                 </div>
+                <!-- NEW: Filter Strategy Group -->
+                <div class="option-row">
+                    <span class="option-label">Filter</span>
+                    <div class="pill-group" id="filterStrategyGroup">
+                        <button type="button" class="pill active" data-value="auto">Auto-Clean</button>
+                        <button type="button" class="pill" data-value="custom">Custom Exts</button>
+                    </div>
+                </div>
             </div>
 
-            <!-- Dynamic Token Section (Hidden by default) -->
+            <div id="customExtensionContainer" class="custom-ext-container hidden">
+                <span class="custom-ext-title">Select Extensions to Include:</span>
+                <div id="extensionList" class="extension-list"></div>
+            </div>
+
+            <!-- Dynamic Token Section for >150 files limit -->
             <div id="tokenSection" class="token-section hidden">
                 <div class="token-hint-box">
                     <div class="hint-content">
                         <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-                        <span id="hintBoxText"><b>Limit Exceeded:</b> Please provide a <a href="https://github.com/settings/tokens" target="_blank">GitHub Token</a> to export >150 files.</span>
+                        <span id="hintBoxText"><b>Limit Exceeded:</b> Go back and enter a GitHub Token to export more than 150 files.</span>
                     </div>
-                    <details class="token-details">
-                        <summary>Why do I need to provide a GitHub token?</summary>
-                        <p>GitHub limits unauthenticated API requests to 60 per hour. Providing a personal token securely bypasses this limit directly from your browser.</p>
-                    </details>
-                    <details class="token-details">
-                        <summary>How to generate a GitHub token</summary>
-                        <div class="token-steps">
-                            <ol>
-                                <li>Go to <a href="https://github.com/settings/tokens" target="_blank">https://github.com/settings/tokens</a></li>
-                                <li>Click <b>Generate new token</b> (Select Fine-grained).</li>
-                                <li>Name your token and (optionally) set a 1-day expiration.</li>
-                                <li>Ensure it has <b>Read-only</b> access to public repositories.</li>
-                                <li>Click <b>Generate token</b>.</li>
-                                <li>Copy the token <i>(Important: you can only copy it once!)</i></li>
-                            </ol>
-                        </div>
-                    </details>
                 </div>
-                <input type="password" id="githubToken" placeholder="Paste GitHub Token here..." autocomplete="off">
             </div>
 
             <div id="progressContainer" class="progress-wrapper hidden">
