@@ -561,14 +561,14 @@ generateBtn.addEventListener('click', async () => {
             document.getElementById('bypassWarning')?.remove();
             generateBtn.insertAdjacentHTML('afterend', `
                 <div id="bypassWarning" style="margin-top:1rem;padding:1rem;border:1px solid var(--border);background:var(--bg-main);color:var(--text-main);border-radius:14px;">
-                    <strong>Nice try, Mr. Hacker! 🕵️‍♂️</strong>
+                    <strong>Oh, look who found the F12 key! 🤓</strong>
                     <p style="margin:0.75rem 0 0.75rem;line-height:1.5;">
-                        But there is no backend server to crash. Piro runs 100% locally in your browser. If you fetch 500 files at once without a token, GitHub's DDoS protection might permanently ban your IP address.
+                        Before you click that button, know this: Piro is 100% client-side. There is no server to crash. You are about to rapidly fire hundreds of HTTP requests directly from your own IP address to GitHub. Do you really want to test their DDoS protection?
                     </p>
-                    <button type="button" class="generate-btn" style="display:inline-flex;width:auto;padding:0.85rem 1.2rem;margin:1rem 0 0 0;border-radius:999px;"
+                    <button type="button" class="generate-btn" "
                         onclick="bypassLimit = true; document.getElementById('bypassWarning')?.remove(); document.getElementById('generateBtn').click();"
                     >
-                        Oh, look who found the F12 key! 🤓 Before you click that shiny hacked button, know this: Piro is 100% client-side. There is no server to crash. You are about to rapidly fire hundreds of HTTP requests directly from your own IP address to GitHub. Do you really want to test their DDoS protection?
+                        Yes. Continue
                     </button>
                 </div>
             `);
