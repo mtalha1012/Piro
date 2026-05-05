@@ -568,7 +568,7 @@ generateBtn.addEventListener('click', async () => {
                     <button type="button" class="generate-btn" style="display:inline-flex;width:auto;padding:0.85rem 1.2rem;margin:1rem 0 0 0;border-radius:999px;"
                         onclick="bypassLimit = true; document.getElementById('bypassWarning')?.remove(); document.getElementById('generateBtn').click();"
                     >
-                        I like living dangerously. Continue Anyway.
+                        Oh, look who found the F12 key! 🤓 Before you click that shiny hacked button, know this: Piro is 100% client-side. There is no server to crash. You are about to rapidly fire hundreds of HTTP requests directly from your own IP address to GitHub. Do you really want to test their DDoS protection?
                     </button>
                 </div>
             `);
