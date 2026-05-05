@@ -7,7 +7,7 @@
 Whether you are a Computer Science student compiling 50 source files into a Microsoft Word (`.docx`) report for a final project, or a developer trying to feed an entire codebase into an LLM (like ChatGPT or Claude) via Markdown (`.md`), Piro does the heavy lifting in seconds.
 
 ## 🚀 Live Demo
-**Try it directly in your browser:** [Insert Live GitHub Pages Link Here]
+**Try it directly in your browser:** https://mtalha1012.github.io/Piro/
 
 ## ✨ Key Features
 
