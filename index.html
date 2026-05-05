@@ -34,7 +34,7 @@
                     </div>
                     <div class="feature-text">
                         <h3>Project Reports</h3>
-                        <p>Generate beautifully formatted .docx files with exact VS Code syntax highlighting for your final code submissions.</p>
+                        <p>Instantly stitch local code and remote repos into polished documents and AI-ready Markdown.</p>
                     </div>
                 </div>
                 
@@ -90,6 +90,14 @@
                     <span id="fetchLoader" class="hidden">Mapping Structure...</span>
                 </button>
             </form>
+
+            <div class="divider-or" style="display:flex;align-items:center;justify-content:center;margin:1rem 0;color:#6b7280;">
+                <span>OR</span>
+            </div>
+            <button type="button" id="selectLocalFolderBtn" class="private-toggle-btn">
+                Select Local Folder
+            </button>
+            <input type="file" id="localFolderInput" webkitdirectory directory multiple hidden>
         </div>
 
         <div id="statusMessage" class="status hidden"></div>
