@@ -20,6 +20,8 @@ const progressBarFill = document.getElementById('progressBarFill');
 
 // --- State & Constants ---
 let repoData = { owner: '', repo: '', branch: '' };
+let dataSource = 'github';
+let localFilesMap = new Map();
 let rawFiles = []; // Holds all fetched files
 let allFiles = []; // Holds currently filtered files
 let lastCheckedNode = null;
@@ -112,6 +114,56 @@ repoUrlInput.addEventListener('keydown', function(e) {
 
 // --- DOM Elements Continued ---
 const tokenSection = document.getElementById('tokenSection');
+const localFolderInput = document.getElementById('localFolderInput');
+const selectLocalFolderBtn = document.getElementById('selectLocalFolderBtn');
+
+selectLocalFolderBtn?.addEventListener('click', () => localFolderInput?.click());
+
+localFolderInput?.addEventListener('change', async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+
+    dataSource = 'local';
+    rawFiles = [];
+    localFilesMap = new Map();
+
+    const rootFolder = files[0]?.webkitRelativePath?.split('/')[0] || 'Local';
+    repoData.owner = 'Local';
+    repoData.repo = rootFolder;
+    repoData.branch = '';
+
+    files.forEach(file => {
+        const relativePath = (file.webkitRelativePath || file.name).replace(/\\/g, '/');
+        const parts = relativePath.split('/');
+        if (parts.some(part => ['node_modules', '.git', 'build'].includes(part))) return;
+        if (!relativePath || relativePath.endsWith('/')) return;
+
+        rawFiles.push(relativePath);
+        localFilesMap.set(relativePath, file);
+    });
+
+    const extSet = new Set();
+    rawFiles.forEach(path => extSet.add(getFileExtension(path)));
+
+    const extListUI = document.getElementById('extensionList');
+    extListUI.innerHTML = '';
+    Array.from(extSet).sort().forEach(ext => {
+        const label = document.createElement('label');
+        label.className = 'ext-label';
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.value = ext;
+        checkbox.checked = !IGNORED_EXTENSIONS.includes(ext) && !IGNORED_FILES.includes(ext);
+        checkbox.addEventListener('change', updateFileTree);
+        label.append(checkbox, document.createTextNode(ext));
+        extListUI.appendChild(label);
+    });
+
+    displayRepoName.textContent = `${repoData.owner} / ${repoData.repo}`;
+    homeScreen.classList.add('hidden');
+    selectionUI.classList.remove('hidden');
+    updateFileTree();
+});
 
 // --- Toggle Token Section (Home Screen) ---
 const toggleTokenBtn = document.getElementById('toggleTokenBtn');
@@ -541,43 +593,63 @@ generateBtn.addEventListener('click', async () => {
                 const rawUrl = `https://raw.githubusercontent.com/${repoData.owner}/${repoData.repo}/${repoData.branch}/${path}`;
                 try {
                     let res;
-                    if (token) {
-                        // raw.githubusercontent.com blocks Authorization via CORS — use the API with raw media type instead
-                        const encodedPath = path.split('/').map(encodeURIComponent).join('/');
-                        const apiUrl = `https://api.github.com/repos/${repoData.owner}/${repoData.repo}/contents/${encodedPath}?ref=${repoData.branch}`;
-                        res = await fetch(apiUrl, {
-                            headers: {
-                                'Authorization': `token ${token}`,
-                                'Accept': 'application/vnd.github.v3.raw'
+                        let file;
+
+                        if (dataSource === 'local') {
+                            file = localFilesMap.get(path);
+                            if (!file) {
+                                console.warn(`Skipping missing local file: ${path}`);
+                                return null;
                             }
-                        });
-                    } else {
-                        res = await fetch(rawUrl);
-                    }
-                    
-                    if (!res.ok) {
-                        if (res.status === 401) {
-                            throw new Error("Token became invalid or expired during download. Please refresh and try again.");
-                        }
-                        if (res.status === 403 || res.status === 429) {
-                            throw new Error("GitHub download limit exceeded. Please ensure your token has sufficient rate limits.");
-                        }
-                        console.warn(`Skipping file (HTTP ${res.status}): ${path}`);
-                        return null; 
-                    }
+                        } else {
+                            if (token) {
+                                // raw.githubusercontent.com blocks Authorization via CORS — use the API with raw media type instead
+                                const encodedPath = path.split('/').map(encodeURIComponent).join('/');
+                                const apiUrl = `https://api.github.com/repos/${repoData.owner}/${repoData.repo}/contents/${encodedPath}?ref=${repoData.branch}`;
+                                res = await fetch(apiUrl, {
+                                    headers: {
+                                        'Authorization': `token ${token}`,
+                                        'Accept': 'application/vnd.github.v3.raw'
+                                    }
+                                });
+                            } else {
+                                res = await fetch(rawUrl);
+                            }
 
-                    processed++;
-                    progressCount.textContent = `${processed}/${targetFiles.length}`;
-                    progressBarFill.style.width = `${(processed / targetFiles.length) * 100}%`;
+                            if (!res.ok) {
+                                if (res.status === 401) {
+                                    throw new Error("Token became invalid or expired during download. Please refresh and try again.");
+                                }
+                                if (res.status === 403 || res.status === 429) {
+                                    throw new Error("GitHub download limit exceeded. Please ensure your token has sufficient rate limits.");
+                                }
+                                console.warn(`Skipping file (HTTP ${res.status}): ${path}`);
+                                return null;
+                            }
+                        }
 
-                    if (isImage(path)) {
-                        if (format === 'md') return { type: 'image', path, url: rawUrl };
-                        const buffer = await res.arrayBuffer();
-                        return { type: 'image', path, buffer };
-                    } else {
-                        const text = await res.text();
-                        
-                        // DYNAMIC UTF-8 / BINARY CHECK
+                        processed++;
+                        progressCount.textContent = `${processed}/${targetFiles.length}`;
+                        progressBarFill.style.width = `${(processed / targetFiles.length) * 100}%`;
+
+                        if (isImage(path)) {
+                            if (dataSource === 'local') {
+                                if (format === 'md') {
+                                    return { type: 'image', path, url: URL.createObjectURL(file) };
+                                }
+                                const buffer = await file.arrayBuffer();
+                                return { type: 'image', path, buffer };
+                            }
+                            if (format === 'md') return { type: 'image', path, url: rawUrl };
+                            const buffer = await res.arrayBuffer();
+                            return { type: 'image', path, buffer };
+                        } else {
+                            let text;
+                            if (dataSource === 'local') {
+                                text = await file.text();
+                            } else {
+                                text = await res.text();
+                            }
                         if (text.includes('\x00') || text.includes('\uFFFD')) {
                             console.warn(`Skipped ${path} - Detected as non-UTF-8 binary content.`);
                             return null;
