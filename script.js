@@ -25,6 +25,7 @@ let localFilesMap = new Map();
 let rawFiles = []; // Holds all fetched files
 let allFiles = []; // Holds currently filtered files
 let lastCheckedNode = null;
+let bypassLimit = false;
 let filterStrategyVal = localStorage.getItem('piro_filterStrategy') || 'auto';
 
 // Load saved preferences from the browser (or fallback to defaults)
@@ -553,7 +554,27 @@ generateBtn.addEventListener('click', async () => {
         if (targetFiles.length === 0) throw new Error("No files selected to generate.");
 
         const token = getGlobalToken();
-        
+
+        if (targetFiles.length > 150 && !token && dataSource !== 'local' && !bypassLimit) {
+            toggleLoadingState('gen', false);
+            progressContainer.classList.add('hidden');
+            document.getElementById('bypassWarning')?.remove();
+            generateBtn.insertAdjacentHTML('afterend', `
+                <div id="bypassWarning" style="margin-top:1rem;padding:1rem;border:1px solid var(--border);background:var(--bg-main);color:var(--text-main);border-radius:14px;">
+                    <strong>Nice try, Mr. Hacker! 🕵️‍♂️</strong>
+                    <p style="margin:0.75rem 0 0.75rem;line-height:1.5;">
+                        But there is no backend server to crash. Piro runs 100% locally in your browser. If you fetch 500 files at once without a token, GitHub's DDoS protection might permanently ban your IP address.
+                    </p>
+                    <button type="button" class="generate-btn" style="display:inline-flex;width:auto;padding:0.85rem 1.2rem;margin:1rem 0 0 0;border-radius:999px;"
+                        onclick="bypassLimit = true; document.getElementById('bypassWarning')?.remove(); document.getElementById('generateBtn').click();"
+                    >
+                        I like living dangerously. Continue Anyway.
+                    </button>
+                </div>
+            `);
+            return;
+        }
+
         const treeText = generateAsciiTree(targetFiles);
 
         let mdContent = `# Project Codebase: ${repoData.repo}\n**Repository:** https://github.com/${repoData.owner}/${repoData.repo}\n\n`;
