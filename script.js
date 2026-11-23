@@ -36,12 +36,42 @@ let codeThemeVal = localStorage.getItem('piro_theme') || 'dark';
 
 // Updated Extensions Lists
 const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.bmp'];
-const BINARY_EXTENSIONS = ['.mp4', '.mp3', '.wav', '.zip', '.pdf', '.exe', '.pyc', '.ttf', '.woff', '.woff2', '.svg', '.ico', '.eot', '.dll', '.bin', '.class', '.jar', '.lock', '.apk'];
+const BINARY_EXTENSIONS = [
+    // Video / audio
+    '.mp4', '.webm', '.mov', '.avi', '.mkv', '.wmv', '.flv', '.m4v', '.mp3', '.wav', '.ogg', '.flac', '.aac', '.m4a',
+    // Images the exporter can't embed
+    '.svg', '.ico', '.webp', '.tif', '.tiff', '.psd', '.heic', '.avif',
+    // Archives
+    '.zip', '.rar', '.7z', '.tar', '.gz', '.tgz', '.bz2', '.xz',
+    // Documents
+    '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.odt',
+    // Compiled / executables
+    '.exe', '.dll', '.so', '.dylib', '.o', '.obj', '.a', '.lib', '.pyc', '.pyo', '.class', '.jar', '.war', '.apk', '.aab', '.ipa', '.wasm', '.bin', '.dat', '.msi', '.dmg', '.iso',
+    // Fonts
+    '.ttf', '.otf', '.woff', '.woff2', '.eot',
+    // Databases / misc
+    '.db', '.sqlite', '.sqlite3', '.mdb', '.pdb', '.lock'
+];
 const IGNORED_EXTENSIONS = ['.iml', '.lock', '.name'];
 const IGNORED_FILES = ['.gitignore', '.DS_Store', 'package-lock.json', 'yarn.lock', 'LICENSE'];
 
 const isImage = (path) => IMAGE_EXTENSIONS.some(ext => path.toLowerCase().endsWith(ext));
 const isBinary = (path) => BINARY_EXTENSIONS.some(ext => path.toLowerCase().endsWith(ext));
+
+// Reads the start of a local file and rejects it if it looks binary (NUL bytes or invalid UTF-8)
+async function isLikelyTextFile(file) {
+    if (file.size === 0) return true;
+    try {
+        const bytes = new Uint8Array(await file.slice(0, 8192).arrayBuffer());
+        if (bytes.includes(0)) return false;
+        // Allow a multi-byte character to be cut off at the 8 KB boundary
+        const text = new TextDecoder('utf-8').decode(bytes);
+        const badChars = (text.match(/�/g) || []).length;
+        return badChars <= (bytes.length === 8192 ? 1 : 0);
+    } catch {
+        return false;
+    }
+}
 
 // --- Pill Group Setup & Persistence ---
 function setupPillGroup(groupId, storageKey, initialValue, onChange) {
@@ -133,12 +163,24 @@ localFolderInput?.addEventListener('change', async (e) => {
     repoData.repo = rootFolder;
     repoData.branch = '';
 
-    files.forEach(file => {
+    const candidates = files.filter(file => {
         const relativePath = (file.webkitRelativePath || file.name).replace(/\\/g, '/');
         const parts = relativePath.split('/');
-        if (parts.some(part => ['node_modules', '.git', 'build'].includes(part))) return;
-        if (!relativePath || relativePath.endsWith('/')) return;
+        if (parts.some(part => ['node_modules', '.git', 'build'].includes(part))) return false;
+        if (!relativePath || relativePath.endsWith('/')) return false;
+        if (isBinary(relativePath)) return false; // Same filter as GitHub repos
+        return true;
+    });
 
+    // Sniff the first bytes of unknown files so binaries with odd/no extensions are hidden too
+    const checks = await Promise.all(candidates.map(async file => {
+        const relativePath = (file.webkitRelativePath || file.name).replace(/\\/g, '/');
+        if (isImage(relativePath)) return { relativePath, file, ok: true };
+        return { relativePath, file, ok: await isLikelyTextFile(file) };
+    }));
+
+    checks.forEach(({ relativePath, file, ok }) => {
+        if (!ok) return;
         rawFiles.push(relativePath);
         localFilesMap.set(relativePath, file);
     });
