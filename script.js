@@ -378,8 +378,8 @@ function validateGenerateBtn() {
     const count = targetFiles.length;
     const tokenVal = getGlobalToken();
 
-    // The >150 Limit Logic
-    if (count > 150) {
+    // The >150 Limit Logic (GitHub only — local folders make no network requests)
+    if (count > 150 && dataSource !== 'local') {
         tokenSection.classList.remove('hidden'); // Slide down the token UI
         if (!tokenVal) {
             generateBtn.disabled = true;
@@ -496,6 +496,9 @@ repoForm.addEventListener('submit', async (e) => {
         const treeRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/${repoData.branch}?recursive=1`, { headers });
         if (!treeRes.ok) throw new Error("Failed to load repository tree.");
         
+        dataSource = 'github';
+        localFilesMap = new Map();
+
         // Save to rawFiles instead of allFiles
         rawFiles = (await treeRes.json()).tree
             .filter(item => item.type === 'blob' && !isBinary(item.path))
